@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cancionero digital del Señor Cautivo de Ayabaca.">
+  <meta name="theme-color" content="#F5F2EA">
+  <title>Cancionero Señor Cautivo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-decoration page-decoration--left" aria-hidden="true">
+    <img src="assets/santuario.png" alt="">
+  </div>
+
+  <div class="page-decoration page-decoration--right" aria-hidden="true">
+    <img src="assets/cautivo.png" alt="">
+  </div>
+
+  <header class="hero">
+    <div class="hero__top-ornament" aria-hidden="true">
+      <span></span>
+      <b>◆ ✥ ◆</b>
+      <span></span>
+    </div>
+
+    <h1>
+      <span class="hero__cross" aria-hidden="true">†</span>
+      <span>Cancionero Señor<br>Cautivo</span>
+      <span class="hero__cross hero__cross--right" aria-hidden="true">†</span>
+    </h1>
+
+    <p class="hero__location">Ayabaca <span>·</span> Piura</p>
+
+    <div class="hero__bottom-ornament" aria-hidden="true">
+      <span>❧</span>
+      <b>◆</b>
+      <span>☙</span>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="songbook" aria-label="Cancionero">
+      <div class="toolbar">
+        <div class="search">
+          <label class="sr-only" for="buscador">Buscar una canción</label>
+          <svg class="search__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5"></circle>
+            <path d="m19 19-4-4"></path>
+          </svg>
+          <input
+            id="buscador"
+            type="search"
+            placeholder="Buscar canción por número, nombre o letra…"
+            autocomplete="off"
+          >
+          <button
+            id="limpiar-busqueda"
+            class="search__clear"
+            type="button"
+            aria-label="Limpiar búsqueda"
+            hidden
+          >&times;</button>
+        </div>
+
+        <button id="cerrar-todo" class="close-all" type="button">
+          Cerrar todo
+        </button>
+      </div>
+
+      <p id="contador" class="counter" aria-live="polite"></p>
+
+      <div id="lista-canciones" class="songs" aria-live="polite"></div>
+
+      <div id="sin-resultados" class="empty-state" hidden>
+        <div class="empty-state__symbol" aria-hidden="true">&#9834;</div>
+        <h2>No se encontraron canciones</h2>
+        <p>Prueba con otro número, título o palabra de la letra.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span aria-hidden="true">✥</span>
+    <p>Señor Cautivo de Ayabaca</p>
+    <small>Fe, tradición y devoción</small>
+  </footer>
+
+  <script src="canciones.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
