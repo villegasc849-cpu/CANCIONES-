@@ -1454,11 +1454,9 @@ CAUTIVO!
     numero: "65",
     titulo: "CHURONITA",
     letra: `
-Churonita
-bonita, bonita
+Churonita bonita, bonita
 yo te llevare
-hasta el santuario
-de mi cautivo
+hasta el santuario de mi cautivo
 te llevare
 Churonita
 bonita, bonita
