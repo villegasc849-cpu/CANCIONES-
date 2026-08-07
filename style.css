@@ -1,789 +1,2242 @@
-:root {
-  --ivory: #F5F2EA;
-  --paper: #FFFBF4;
-  --white: #FFFFFF;
-  --purple: #4A3A68;
-  --purple-dark: #352448;
-  --gold: #A88A44;
-  --gold-soft: #D5C18E;
-  --text: #2F2A26;
-  --muted: #786F66;
-  --border: #DDD7CC;
-  --shadow: 0 14px 35px rgba(60, 45, 35, 0.09);
+const listaCanciones = document.querySelector("#lista-canciones");
+const buscador = document.querySelector("#buscador");
+const contador = document.querySelector("#contador");
+const sinResultados = document.querySelector("#sin-resultados");
+const limpiarBusqueda = document.querySelector("#limpiar-busqueda");
+const cerrarTodo = document.querySelector("#cerrar-todo");
+const generarPdf = document.querySelector("#generar-pdf");
+const estadoCarga = document.querySelector("#estado-carga");
+
+let canciones = [];
+let cancionAbierta = null;
+
+function normalizarTexto(texto) {
+  return String(texto)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
-* {
-  box-sizing: border-box;
+function obtenerEnlaceYoutube(cancion) {
+  const valor = cancion.youtube.trim();
+
+  if (!valor) return "";
+
+  let enlace = valor;
+
+  if (!/^https?:\/\//i.test(valor)) {
+    enlace = `https://www.youtube.com/watch?v=${encodeURIComponent(valor)}`;
+  }
+
+  try {
+    const url = new URL(enlace);
+    url.searchParams.delete("t");
+    url.searchParams.delete("start");
+    enlace = url.toString();
+  } catch {}
+
+  const separador = enlace.includes("?") ? "&" : "?";
+  const inicio = Number(cancion.inicio);
+
+  return inicio > 0 ? `${enlace}${separador}t=${inicio}s` : enlace;
 }
 
-html {
-  scroll-behavior: smooth;
+function obtenerVideoYoutube(cancion) {
+  const enlace = obtenerEnlaceYoutube(cancion);
+  if (!enlace) return null;
+
+  try {
+    const url = new URL(enlace);
+    let videoId = "";
+
+    if (url.hostname.includes("youtu.be")) {
+      videoId = url.pathname.split("/").filter(Boolean)[0] || "";
+    } else if (url.pathname.startsWith("/shorts/")) {
+      videoId = url.pathname.split("/")[2] || "";
+    } else if (url.pathname.startsWith("/embed/")) {
+      videoId = url.pathname.split("/")[2] || "";
+    } else {
+      videoId = url.searchParams.get("v") || "";
+    }
+
+    if (!videoId) return null;
+
+    const inicio = Math.max(0, Number(cancion.inicio) || 0);
+
+    const parametros = new URLSearchParams({
+      rel: "0",
+      modestbranding: "1",
+      playsinline: "1"
+    });
+
+    if (inicio > 0) {
+      parametros.set("start", String(inicio));
+    }
+
+    if (
+      window.location.protocol === "http:" ||
+      window.location.protocol === "https:"
+    ) {
+      parametros.set("origin", window.location.origin);
+    }
+
+    return {
+      externo: enlace,
+      embed: `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${parametros}`
+    };
+  } catch {
+    return null;
+  }
 }
 
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
-  color: var(--text);
-  background:
-    radial-gradient(circle at 50% 16%, rgba(255, 255, 255, 0.95), transparent 27rem),
-    linear-gradient(180deg, #FAF8F2 0%, var(--ivory) 100%);
-  font-family: Georgia, "Times New Roman", serif;
-  line-height: 1.6;
+function crearReproductorYoutube(cancion) {
+  const video = obtenerVideoYoutube(cancion);
+  if (!video) return null;
+
+  const seccion = document.createElement("section");
+  seccion.className = "song__media";
+
+  const boton = document.createElement("button");
+  boton.className = "song__video-button";
+  boton.type = "button";
+  boton.textContent = "Ver video";
+  boton.setAttribute("aria-expanded", "false");
+
+  const contenedor = document.createElement("div");
+  contenedor.className = "song__player";
+  contenedor.hidden = true;
+
+  const ayuda = document.createElement("p");
+  ayuda.className = "song__video-help";
+  ayuda.append("Si el video no se reproduce aquí, ");
+
+  const enlaceExterno = document.createElement("a");
+  enlaceExterno.href = video.externo;
+  enlaceExterno.target = "_blank";
+  enlaceExterno.rel = "noopener noreferrer";
+  enlaceExterno.textContent = "abrir en YouTube";
+
+  ayuda.append(enlaceExterno, ".");
+
+  boton.addEventListener("click", () => {
+    const estaVisible = !contenedor.hidden;
+
+    if (estaVisible) {
+      contenedor.replaceChildren();
+      contenedor.hidden = true;
+      boton.textContent = "Ver video";
+      boton.setAttribute("aria-expanded", "false");
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+
+    iframe.src = video.embed;
+    iframe.title = `Video de ${cancion.titulo}`;
+    iframe.loading = "lazy";
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+
+    iframe.allowFullscreen = true;
+
+    contenedor.append(iframe);
+    contenedor.hidden = false;
+
+    boton.textContent = "Ocultar video";
+    boton.setAttribute("aria-expanded", "true");
+  });
+
+  seccion.append(boton, contenedor, ayuda);
+
+  return seccion;
 }
 
-body::before {
-  position: fixed;
-  inset: 0;
-  z-index: -3;
-  content: "";
-  pointer-events: none;
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgba(74, 58, 104, 0.012) 0,
-    rgba(74, 58, 104, 0.012) 1px,
-    transparent 1px,
-    transparent 5px
+function detenerVideoDeCancion(cancion) {
+  const reproductor = cancion.querySelector(".song__player");
+  const boton = cancion.querySelector(".song__video-button");
+
+  if (!reproductor || !boton) return;
+
+  reproductor.replaceChildren();
+  reproductor.hidden = true;
+
+  boton.textContent = "Ver video";
+  boton.setAttribute("aria-expanded", "false");
+}
+
+function esIndicacionMusical(linea) {
+  return /^\s*\(?\s*(coro|instrumental)\s*(?:…|\.{3})?\s*\)?\s*$/i.test(linea);
+}
+
+function crearLineaLetra(texto) {
+  const linea = document.createElement("span");
+  const patronDestacado = /(\(\s*bis\s*\)|\bbis\b)/gi;
+  let posicion = 0;
+
+  if (esIndicacionMusical(texto)) {
+    const destacado = document.createElement("strong");
+    destacado.className = "song__direction";
+    destacado.textContent = texto;
+    linea.append(destacado);
+
+    return linea;
+  }
+
+  for (const coincidencia of texto.matchAll(patronDestacado)) {
+    linea.append(
+      document.createTextNode(
+        texto.slice(posicion, coincidencia.index)
+      )
+    );
+
+    const destacado = document.createElement("strong");
+    destacado.className = "song__repeat";
+    destacado.textContent = coincidencia[0];
+
+    linea.append(destacado);
+
+    posicion = coincidencia.index + coincidencia[0].length;
+  }
+
+  linea.append(document.createTextNode(texto.slice(posicion)));
+
+  return linea;
+}
+
+function crearEstrofas(texto) {
+  const fragmento = document.createDocumentFragment();
+  const lineas = texto.trim().split(/\r?\n/);
+  let estrofa = [];
+
+  function agregarEstrofa() {
+    if (!estrofa.length) return;
+
+    const bloque = document.createElement("p");
+    bloque.className = "song__stanza";
+
+    estrofa.forEach((linea) => bloque.append(crearLineaLetra(linea)));
+
+    fragmento.append(bloque);
+    estrofa = [];
+  }
+
+  lineas.forEach((lineaOriginal) => {
+    const linea = lineaOriginal.trim();
+
+    if (!linea) {
+      agregarEstrofa();
+      return;
+    }
+
+    if (esIndicacionMusical(linea)) {
+      agregarEstrofa();
+      estrofa.push(linea);
+      agregarEstrofa();
+      return;
+    }
+
+    estrofa.push(linea);
+
+    if (/(\(\s*bis\s*\)|\bbis\b)/i.test(linea) || estrofa.length === 4) {
+      agregarEstrofa();
+    }
+  });
+
+  agregarEstrofa();
+
+  return fragmento;
+}
+
+function crearCancion(cancion) {
+  const articulo = document.createElement("article");
+  const idContenido = `letra-${cancion.numero.replace(/\W/g, "-")}`;
+  const reproductorYoutube = crearReproductorYoutube(cancion);
+
+  articulo.className = "song";
+  articulo.dataset.numero = cancion.numero;
+
+  const boton = document.createElement("button");
+  boton.className = "song__button";
+  boton.type = "button";
+  boton.setAttribute("aria-expanded", "false");
+  boton.setAttribute("aria-controls", idContenido);
+
+  const numero = document.createElement("span");
+  numero.className = "song__number";
+  numero.textContent = cancion.numero;
+
+  const titulo = document.createElement("span");
+  titulo.className = "song__title";
+  titulo.textContent = cancion.titulo;
+
+  const icono = document.createElement("span");
+  icono.className = "song__chevron";
+  icono.setAttribute("aria-hidden", "true");
+
+  boton.append(numero, titulo, icono);
+
+  const contenido = document.createElement("div");
+  contenido.className = "song__content";
+  contenido.id = idContenido;
+
+  const contenidoInterior = document.createElement("div");
+  contenidoInterior.className = "song__content-inner";
+
+  const letra = document.createElement("div");
+  letra.className = "song__lyrics";
+  letra.append(crearEstrofas(cancion.letra));
+
+  if (reproductorYoutube) {
+    letra.append(reproductorYoutube);
+  }
+
+  contenidoInterior.append(letra);
+  contenido.append(contenidoInterior);
+
+  articulo.append(boton, contenido);
+
+  boton.addEventListener("click", () => {
+    alternarCancion(
+      articulo,
+      boton,
+      cancion.numero
+    );
+  });
+
+  return articulo;
+}
+
+function alternarCancion(articulo, boton, numeroCancion) {
+  const estabaAbierta = cancionAbierta === numeroCancion;
+
+  document
+    .querySelectorAll(".song.is-open")
+    .forEach((cancion) => {
+      detenerVideoDeCancion(cancion);
+
+      cancion.classList.remove("is-open");
+
+      cancion
+        .querySelector(".song__button")
+        .setAttribute("aria-expanded", "false");
+    });
+
+  if (estabaAbierta) {
+    cancionAbierta = null;
+    return;
+  }
+
+  articulo.classList.add("is-open");
+  boton.setAttribute("aria-expanded", "true");
+
+  cancionAbierta = numeroCancion;
+}
+
+function cerrarTodasLasCanciones() {
+  document
+    .querySelectorAll(".song.is-open")
+    .forEach((cancion) => {
+      detenerVideoDeCancion(cancion);
+      cancion.classList.remove("is-open");
+
+      cancion
+        .querySelector(".song__button")
+        .setAttribute("aria-expanded", "false");
+    });
+
+  cancionAbierta = null;
+}
+
+function filtrarCanciones() {
+  const consulta = normalizarTexto(buscador.value);
+
+  const resultados = canciones.filter((cancion) => {
+    const contenido = normalizarTexto(
+      `${cancion.numero} ${cancion.titulo} ${cancion.letra}`
+    );
+
+    return contenido.includes(consulta);
+  });
+
+  renderizarCanciones(resultados);
+
+  limpiarBusqueda.hidden = buscador.value.length === 0;
+}
+
+function renderizarCanciones(resultados) {
+  listaCanciones.replaceChildren(
+    ...resultados.map(crearCancion)
+  );
+
+  contador.textContent =
+    `Mostrando ${resultados.length} de ${canciones.length} canciones`;
+
+  sinResultados.hidden = resultados.length !== 0;
+  listaCanciones.hidden = resultados.length === 0;
+
+  if (
+    !resultados.some(
+      (cancion) => cancion.numero === cancionAbierta
+    )
+  ) {
+    cancionAbierta = null;
+  }
+}
+
+buscador.addEventListener("input", filtrarCanciones);
+
+limpiarBusqueda.addEventListener("click", () => {
+  buscador.value = "";
+  filtrarCanciones();
+  buscador.focus();
+});
+
+cerrarTodo.addEventListener(
+  "click",
+  cerrarTodasLasCanciones
+);
+
+async function cargarCanciones() {
+  try {
+    canciones = await window.CancioneroDB.listSongs();
+
+    estadoCarga.hidden = true;
+
+    renderizarCanciones(canciones);
+  } catch (error) {
+    console.error(error);
+
+    estadoCarga.textContent =
+      "No se pudieron cargar las canciones.";
+  }
+}
+
+function escaparHtml(texto) {
+  return String(texto).replace(
+    /[&<>"']/g,
+    (caracter) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[caracter]
   );
 }
 
-button,
-input {
-  font: inherit;
-}
-
-button {
-  color: inherit;
-}
+function generarLibro() {
+  if (!canciones.length) return;
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+  /*
+    ==================================================
+    IMÁGENES DE LA PORTADA
+    ==================================================
 
-.page-decoration {
-  position: fixed;
-  z-index: -1;
-  bottom: 0;
-  pointer-events: none;
-  overflow: visible;
-}
+    Estas rutas coinciden con tu repositorio:
 
-.page-decoration--left {
-  left: 0;
-  width: clamp(260px, 31vw, 560px);
-  height: 55vh;
-}
+    assets/
+      cautivo.png
+      santuario.png
+  */
 
-.page-decoration--right {
-  right: -1rem;
-  width: clamp(250px, 28vw, 500px);
-  height: 78vh;
-}
+  const urlCautivo = new URL(
+    "assets/cautivo.png",
+    window.location.href
+  ).href;
 
-.page-decoration img {
-  position: absolute;
-  display: block;
-  max-width: none;
-  filter: saturate(0.92);
-}
+  const urlSantuario = new URL(
+    "assets/santuario.png",
+    window.location.href
+  ).href;
 
-.page-decoration--left img {
-  bottom: -1%;
-  left: -8%;
-  width: 116%;
-  opacity: 0.24;
-}
+  const paginaBlanca = () =>
+    `<section class="book-page blank-page"></section>`;
 
-.page-decoration--right img {
-  right: 0;
-  bottom: -2%;
-  width: 100%;
-  opacity: 0.47;
-}
+  const paginaCancion = (cancion) => `
+    <article class="book-page song-page">
 
-.hero {
-  position: relative;
-  width: min(100% - 2rem, 1120px);
-  margin: 0 auto;
-  padding: clamp(2.4rem, 6vw, 4.2rem) 1rem 2.1rem;
-  text-align: center;
-}
+      <header class="song-heading">
 
-.hero__top-ornament {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.7rem;
-  width: min(100%, 370px);
-  margin: 0 auto 0.55rem;
-  color: var(--gold);
-}
+        <span class="song-number">
+          ${escaparHtml(cancion.numero)}
+        </span>
 
-.hero__top-ornament span {
-  width: 100%;
-  height: 1px;
-  background: var(--gold);
-}
+        <h2>
+          ${escaparHtml(cancion.titulo)}
+        </h2>
 
-.hero__top-ornament b {
-  flex: none;
-  font-size: 0.7rem;
-  font-weight: 400;
-  letter-spacing: 0.4em;
-}
+      </header>
 
-.hero h1 {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(0.35rem, 2vw, 1rem);
-  margin: 0;
-  color: var(--purple-dark);
-  font-size: clamp(2.65rem, 6.7vw, 5.7rem);
-  font-weight: 400;
-  letter-spacing: -0.045em;
-  line-height: 0.91;
-  text-transform: uppercase;
-  text-wrap: balance;
-  text-shadow: 0 2px 0 rgba(168, 138, 68, 0.18);
-}
+      ${
+        cancion.categoria
+          ? `
+            <p class="song-category">
+              ${escaparHtml(cancion.categoria)}
+            </p>
+          `
+          : ""
+      }
 
-.hero__cross {
-  flex: none;
-  align-self: flex-start;
-  margin-top: 0.15em;
-  font-size: 0.72em;
-  transform: rotate(-5deg);
-}
+      <div class="song-text">
 
-.hero__cross--right {
-  align-self: flex-end;
-  margin-bottom: 0.12em;
-  transform: rotate(5deg);
-}
+        ${escaparHtml(cancion.letra).replace(
+          /\n/g,
+          "<br>"
+        )}
 
-.hero__location {
-  margin: 1.15rem 0 0;
-  color: var(--gold);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: clamp(0.74rem, 1.6vw, 0.95rem);
-  font-weight: 700;
-  letter-spacing: 0.38em;
-  text-transform: uppercase;
-}
+      </div>
 
-.hero__location span {
-  margin: 0 0.3rem;
-}
+    </article>
+  `;
 
-.hero__bottom-ornament {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.7rem;
-  margin-top: 1.15rem;
-  color: var(--gold);
-  font-size: 1.45rem;
-}
+  /*
+    ==================================================
+    PÁGINAS
+    ==================================================
+  */
 
-.hero__bottom-ornament b {
-  font-size: 0.58rem;
-}
+  const paginas = [
 
-.main-content {
-  width: min(100% - 2rem, 1120px);
-  margin: 0 auto;
-}
+    /*
+      PORTADA
 
-.songbook {
-  position: relative;
-}
+      santuario.png =
+      fondo.
 
-.toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.75rem;
-}
+      cautivo.png =
+      imagen principal.
+    */
 
-.search {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
+    `
+      <section class="book-page book-cover">
 
-.search__icon {
-  position: absolute;
-  left: 1.35rem;
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: var(--gold);
-  stroke-linecap: round;
-  stroke-width: 1.8;
-}
+        <img
+          class="cover-sanctuary"
+          src="${urlSantuario}"
+          alt=""
+        >
 
-.search input {
-  width: 100%;
-  min-height: 64px;
-  padding: 1rem 3.25rem 1rem 3.85rem;
-  color: var(--text);
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(168, 138, 68, 0.32);
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(75, 58, 37, 0.06);
-  outline: none;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 1rem;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-}
+        <div class="cover-overlay"></div>
 
-.search input::placeholder {
-  color: #817B75;
-}
+        <div class="cover-content">
 
-.search input:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 4px rgba(168, 138, 68, 0.13), var(--shadow);
-}
+          <div class="cover-ornament">
+            ✥
+          </div>
 
-.search__clear {
-  position: absolute;
-  right: 0.9rem;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  color: var(--muted);
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 1.45rem;
-}
+          <img
+            class="cover-cautivo"
+            src="${urlCautivo}"
+            alt="Señor Cautivo de Ayabaca"
+          >
+
+          <h1>
+            Cancionero
+          </h1>
+
+          <h2>
+            Señor Cautivo
+          </h2>
+
+          <p>
+            Ayabaca · Piura
+          </p>
+
+          <div class="cover-line"></div>
+
+          <small>
+            Fe · tradición · devoción
+          </small>
+
+        </div>
+
+      </section>
+    `,
+
+    ...canciones.map(paginaCancion)
+
+  ];
 
-.search__clear:hover {
-  color: var(--purple);
-  background: rgba(74, 58, 104, 0.07);
-}
+  /*
+    Cada A4 impreso por ambas caras
+    representa 8 páginas finales A6.
+  */
+
+  while (paginas.length % 8 !== 0) {
+    paginas.push(paginaBlanca());
+  }
+
+  const totalPaginas = paginas.length;
 
-.close-all {
-  min-width: 140px;
-  padding: 0 1.3rem;
-  color: var(--purple-dark);
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(168, 138, 68, 0.32);
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(75, 58, 37, 0.05);
-  cursor: pointer;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.88rem;
-  font-weight: 700;
-  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
-}
+  const cantidadHojasA5 =
+    totalPaginas / 4;
 
-.close-all:hover {
-  color: var(--white);
-  background: var(--purple);
-}
+  const cantidadHojasA4 =
+    cantidadHojasA5 / 2;
 
-.close-all:active {
-  transform: translateY(1px);
-}
+  /*
+    ==================================================
+    IMPOSICIÓN DE CUADERNILLO
+    ==================================================
+  */
 
-.counter {
-  margin: 0.75rem 0 0.85rem 0.35rem;
-  color: var(--muted);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.9rem;
-}
+  const hojasA5 = [];
+
+  for (
+    let i = 0;
+    i < cantidadHojasA5;
+    i += 1
+  ) {
+    hojasA5.push({
 
-.songs {
-  display: grid;
-  gap: 0.9rem;
-}
+      frente: [
+        totalPaginas - i * 2,
+        1 + i * 2
+      ],
+
+      reverso: [
+        2 + i * 2,
+        totalPaginas - 1 - i * 2
+      ]
 
-.song {
-  overflow: hidden;
-  background: rgba(255, 251, 244, 0.94);
-  border: 1px solid rgba(168, 138, 68, 0.28);
-  border-radius: 19px;
-  box-shadow: var(--shadow);
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-}
+    });
+  }
+
+  const obtenerPagina =
+    (numero) =>
+      paginas[numero - 1] ||
+      paginaBlanca();
+
+  function numeroVisible(numero) {
+    if (numero <= 1) {
+      return "";
+    }
+
+    return `
+      <span class="printed-page-number">
+        ${numero}
+      </span>
+    `;
+  }
+
+  function crearMitadA5(
+    par,
+    clase
+  ) {
+    const [
+      izquierda,
+      derecha
+    ] = par;
+
+    return `
+      <section
+        class="
+          half-sheet
+          ${clase}
+        "
+      >
+
+        <div
+          class="
+            imposed-page
+            imposed-page--left
+          "
+        >
+
+          ${obtenerPagina(izquierda)}
+
+          ${numeroVisible(izquierda)}
+
+        </div>
+
+
+        <div
+          class="fold-guide"
+          aria-hidden="true"
+        ></div>
+
+
+        <div
+          class="
+            imposed-page
+            imposed-page--right
+          "
+        >
+
+          ${obtenerPagina(derecha)}
+
+          ${numeroVisible(derecha)}
+
+        </div>
+
+      </section>
+    `;
+  }
 
-.song:hover {
-  border-color: rgba(168, 138, 68, 0.6);
-  transform: translateY(-1px);
-}
+  let hojasImpuestas = "";
+
+  for (
+    let i = 0;
+    i < cantidadHojasA4;
+    i += 1
+  ) {
+    const superior =
+      hojasA5[i * 2];
+
+    const inferior =
+      hojasA5[i * 2 + 1];
+
+    /*
+      PDF impar =
+      frente.
+
+      PDF par =
+      reverso.
+    */
+
+    hojasImpuestas += `
 
-.song.is-open {
-  border-color: var(--gold);
-  box-shadow: 0 18px 38px rgba(53, 36, 72, 0.12);
-}
+      <section
+        class="
+          a4-sheet
+          a4-sheet--front
+        "
+      >
 
-.song__button {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 1.25rem;
-  width: 100%;
-  min-height: 88px;
-  padding: 0.85rem 1.25rem;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
+        ${crearMitadA5(
+          superior.frente,
+          "half-sheet--top"
+        )}
 
-.song__button:focus-visible,
-.close-all:focus-visible,
-.search__clear:focus-visible {
-  outline: 3px solid rgba(168, 138, 68, 0.42);
-  outline-offset: -3px;
-}
+        ${crearMitadA5(
+          inferior.frente,
+          "half-sheet--bottom"
+        )}
 
-.song__number {
-  display: grid;
-  place-items: center;
-  min-width: 52px;
-  height: 52px;
-  padding: 0 0.5rem;
-  color: var(--white);
-  background: var(--purple);
-  border: 2px solid var(--gold);
-  border-radius: 50%;
-  box-shadow: 0 7px 14px rgba(53, 36, 72, 0.18);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
+        <div class="cut-guide">
+          <span>
+            CORTAR
+          </span>
+        </div>
 
-.song__title {
-  color: var(--purple-dark);
-  font-size: clamp(1.02rem, 2.2vw, 1.3rem);
-  font-weight: 700;
-  letter-spacing: 0.015em;
-  text-transform: uppercase;
-}
+      </section>
 
-.song__chevron {
-  position: relative;
-  width: 28px;
-  height: 28px;
-}
 
-.song__chevron::before,
-.song__chevron::after {
-  position: absolute;
-  top: 13px;
-  width: 9px;
-  height: 2px;
-  content: "";
-  background: var(--purple);
-  transition: transform 180ms ease;
-}
+      <section
+        class="
+          a4-sheet
+          a4-sheet--back
+        "
+      >
 
-.song__chevron::before {
-  left: 6px;
-  transform: rotate(45deg);
-}
+        ${crearMitadA5(
+          superior.reverso,
+          "half-sheet--top"
+        )}
 
-.song__chevron::after {
-  right: 6px;
-  transform: rotate(-45deg);
-}
+        ${crearMitadA5(
+          inferior.reverso,
+          "half-sheet--bottom"
+        )}
 
-.song.is-open .song__chevron::before {
-  transform: rotate(-45deg);
-}
+        <div class="cut-guide">
+          <span>
+            CORTAR
+          </span>
+        </div>
 
-.song.is-open .song__chevron::after {
-  transform: rotate(45deg);
-}
+      </section>
+    `;
+  }
 
-.song__content {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 260ms ease;
-}
+  const ventana =
+    window.open(
+      "",
+      "_blank"
+    );
 
-.song.is-open .song__content {
-  grid-template-rows: 1fr;
-}
+  if (!ventana) {
+    alert(
+      "Permite las ventanas emergentes para generar el libro."
+    );
 
-.song__content-inner {
-  overflow: hidden;
-}
+    return;
+  }
 
-.song__lyrics {
-  margin: 0 1.4rem;
-  padding: 1.7rem clamp(0.4rem, 5vw, 3.2rem) 2.2rem;
-  color: #443D37;
-  border-top: 1px solid var(--border);
-  font-size: 1.05rem;
-  line-height: 1.9;
-  text-align: center;
-  white-space: pre-line;
-}
+  ventana.document.write(`
+<!doctype html>
 
-.song__stanza {
-  margin: 0 0 1.45rem;
-}
+<html lang="es">
 
-.song__stanza:last-child {
-  margin-bottom: 0;
-}
+<head>
 
-.song__stanza > span {
-  display: block;
-}
+<meta charset="utf-8">
 
-.song__repeat,
-.song__direction {
-  color: var(--purple-dark);
-  font-weight: 700;
-}
+<meta
+  name="viewport"
+  content="
+    width=device-width,
+    initial-scale=1
+  "
+>
 
-.song__direction {
-  display: inline-block;
-  padding: 0.08rem 0.55rem;
-  color: var(--purple);
-  background: rgba(168, 138, 68, 0.11);
-  border-radius: 999px;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.76em;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+<title>
+  Cancionero Señor Cautivo — Cuadernillo
+</title>
 
-.song__media {
-  margin-top: 1.7rem;
-  padding-top: 1.35rem;
-  border-top: 1px solid rgba(168, 138, 68, 0.25);
-}
+<style>
 
-.song__video-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.6rem 0.9rem;
-  color: var(--purple);
-  background: transparent;
-  border: 1px solid var(--gold);
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+@page {
+  size:
+    A4 portrait;
 
-.song__video-button:hover {
-  color: var(--white);
-  background: var(--purple);
-  border-color: var(--purple);
+  margin:
+    0;
 }
 
-.song__video-button:focus-visible {
-  outline: 3px solid rgba(168, 138, 68, 0.35);
-  outline-offset: 3px;
+* {
+  box-sizing:
+    border-box;
 }
 
-.song__player {
-  position: relative;
-  width: min(100%, 760px);
-  aspect-ratio: 16 / 9;
-  margin: 1.25rem auto 0;
-  overflow: hidden;
-  background: #17131D;
-  border: 1px solid rgba(168, 138, 68, 0.45);
-  border-radius: 13px;
-  box-shadow: 0 14px 30px rgba(47, 42, 38, 0.14);
-}
+html,
+body {
+  margin:
+    0;
 
-.song__player[hidden] {
-  display: none;
-}
+  padding:
+    0;
 
-.song__player iframe {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
+  color:
+    #2F2A26;
 
-.song__player--notice {
-  display: grid;
-  place-items: center;
-  aspect-ratio: auto;
-  min-height: 220px;
-  padding: 1.5rem;
   background:
-    radial-gradient(circle at 50% 0%, rgba(168, 138, 68, 0.15), transparent 70%),
-    var(--paper);
+    #ECEAE6;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
 }
 
-.song__local-video-notice {
-  max-width: 520px;
-  color: var(--text);
-  text-align: center;
+
+/*
+  ================================================
+  INSTRUCCIONES
+  ================================================
+*/
+
+.print-help {
+  width:
+    min(
+      92%,
+      940px
+    );
+
+  margin:
+    24px auto;
+
+  padding:
+    24px 28px;
+
+  background:
+    #FFFDF8;
+
+  border:
+    1px solid #D5C18E;
+
+  border-radius:
+    18px;
+
+  box-shadow:
+    0 12px 30px
+    rgba(
+      53,
+      36,
+      72,
+      .10
+    );
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  line-height:
+    1.55;
 }
 
-.song__local-video-notice strong {
-  color: var(--purple);
-  font-size: 1.1rem;
+.print-help h1 {
+  margin:
+    0 0 12px;
+
+  color:
+    #352448;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+
+  font-size:
+    28px;
 }
 
-.song__local-video-notice p {
-  margin: 0.55rem 0 1rem;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.88rem;
-  line-height: 1.6;
+.print-help h2 {
+  margin:
+    22px 0 8px;
+
+  color:
+    #4A3A68;
+
+  font-size:
+    18px;
 }
 
-.song__local-video-notice a {
-  display: inline-flex;
-  padding: 0.55rem 0.9rem;
-  color: var(--white);
-  background: var(--purple);
-  border-radius: 999px;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-decoration: none;
-  text-transform: uppercase;
+.print-help p {
+  margin:
+    8px 0;
 }
 
-.song__video-help {
-  margin: 0.75rem 0 0;
-  color: var(--muted);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.72rem;
-  line-height: 1.5;
+.print-help strong {
+  color:
+    #352448;
 }
 
-.song__video-help a {
-  color: var(--purple);
-  font-weight: 700;
+.print-help .important {
+  margin-top:
+    16px;
+
+  padding:
+    13px 15px;
+
+  background:
+    #F5F2EA;
+
+  border-left:
+    4px solid #A88A44;
+
+  border-radius:
+    8px;
 }
 
-.empty-state {
-  margin-top: 1rem;
-  padding: 3.5rem 1rem;
-  text-align: center;
-  background: rgba(255, 251, 244, 0.76);
-  border: 1px dashed var(--gold-soft);
-  border-radius: 19px;
+.print-help button {
+  margin-top:
+    18px;
+
+  padding:
+    12px 20px;
+
+  color:
+    #FFFFFF;
+
+  background:
+    #4A3A68;
+
+  border:
+    0;
+
+  border-radius:
+    10px;
+
+  cursor:
+    pointer;
+
+  font-weight:
+    700;
+
+  font-size:
+    15px;
 }
 
-.empty-state__symbol {
-  color: var(--gold);
-  font-size: 2.3rem;
+
+/*
+  ================================================
+  A4
+  ================================================
+*/
+
+.a4-sheet {
+  position:
+    relative;
+
+  display:
+    grid;
+
+  grid-template-rows:
+    148.5mm
+    148.5mm;
+
+  width:
+    210mm;
+
+  height:
+    297mm;
+
+  margin:
+    0 auto 10mm;
+
+  overflow:
+    hidden;
+
+  background:
+    #FFFFFF;
+
+  break-after:
+    page;
+
+  page-break-after:
+    always;
 }
 
-.empty-state h2 {
-  margin: 0.4rem 0 0.2rem;
-  color: var(--purple);
-  font-size: 1.3rem;
+.a4-sheet:last-child {
+  break-after:
+    auto;
+
+  page-break-after:
+    auto;
 }
 
-.empty-state p {
-  margin: 0;
-  color: var(--muted);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.9rem;
+
+/*
+  Corte ÚNICAMENTE horizontal.
+*/
+
+.cut-guide {
+  position:
+    absolute;
+
+  z-index:
+    30;
+
+  top:
+    148.5mm;
+
+  left:
+    0;
+
+  width:
+    210mm;
+
+  height:
+    0;
+
+  border-top:
+    .35mm dashed
+    rgba(
+      0,
+      0,
+      0,
+      .62
+    );
+
+  pointer-events:
+    none;
 }
 
-.footer {
-  padding: 3.2rem 1rem 2rem;
-  color: var(--purple);
-  text-align: center;
+.cut-guide span {
+  position:
+    absolute;
+
+  top:
+    -3.2mm;
+
+  left:
+    3mm;
+
+  padding:
+    0 .8mm;
+
+  color:
+    #555;
+
+  background:
+    #FFFFFF;
+
+  font:
+    5.5pt
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  letter-spacing:
+    .08em;
 }
 
-.footer > span {
-  color: var(--gold);
+
+/*
+  ================================================
+  A5 HORIZONTAL
+  ================================================
+*/
+
+.half-sheet {
+  position:
+    relative;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    105mm
+    105mm;
+
+  width:
+    210mm;
+
+  height:
+    148.5mm;
+
+  overflow:
+    hidden;
+
+  background:
+    #FFFFFF;
 }
 
-.footer p {
-  margin: 0.25rem 0 0;
+
+/*
+  Línea vertical =
+  solamente DOBLEZ.
+
+  NO cortar.
+*/
+
+.fold-guide {
+  position:
+    absolute;
+
+  z-index:
+    20;
+
+  top:
+    0;
+
+  bottom:
+    0;
+
+  left:
+    105mm;
+
+  width:
+    0;
+
+  border-left:
+    .18mm dotted
+    rgba(
+      168,
+      138,
+      68,
+      .42
+    );
+
+  pointer-events:
+    none;
 }
 
-.footer small {
-  color: var(--muted);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+
+/*
+  ================================================
+  PÁGINA FINAL A6
+  ================================================
+*/
+
+.imposed-page {
+  position:
+    relative;
+
+  width:
+    105mm;
+
+  height:
+    148.5mm;
+
+  overflow:
+    hidden;
+
+  background:
+    #FFFFFF;
 }
 
-@media (max-width: 760px) {
-  .page-decoration {
-    opacity: 0.52;
-  }
+.book-page {
+  position:
+    relative;
 
-  .page-decoration--left {
-    width: 60vw;
-    height: 35vh;
-  }
+  width:
+    100%;
 
-  .page-decoration--right {
-    right: -3rem;
-    width: 66vw;
-    height: 48vh;
-  }
+  height:
+    100%;
 
-  .page-decoration--left img {
-    opacity: 0.18;
-  }
+  overflow:
+    hidden;
 
-  .page-decoration--right img {
-    right: 0;
-    width: 100%;
-    opacity: 0.28;
-  }
+  padding:
+    5.8mm
+    5.4mm
+    7.5mm;
 
-  .hero {
-    padding-top: 2.5rem;
-  }
-
-  .hero h1 {
-    font-size: clamp(2.35rem, 12vw, 4.2rem);
-  }
-
-  .hero__cross {
-    display: none;
-  }
-
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .close-all {
-    min-height: 48px;
-  }
+  background:
+    #FFFFFF;
 }
 
-@media (max-width: 520px) {
-  .hero {
-    width: min(100% - 1rem, 1120px);
-    padding: 2.2rem 0.25rem 1.6rem;
-  }
+.printed-page-number {
+  position:
+    absolute;
 
-  .hero__top-ornament {
-    width: 230px;
-  }
+  z-index:
+    10;
 
-  .hero h1 {
-    line-height: 0.96;
-  }
+  right:
+    0;
 
-  .hero__location {
-    letter-spacing: 0.26em;
-  }
+  bottom:
+    2.2mm;
 
-  .main-content {
-    width: min(100% - 1rem, 1120px);
-  }
+  left:
+    0;
 
-  .search input {
-    min-height: 58px;
-    padding-left: 3.25rem;
-    font-size: 0.9rem;
-  }
+  color:
+    #80766D;
 
-  .search__icon {
-    left: 1.05rem;
-    width: 21px;
-  }
+  text-align:
+    center;
 
-  .counter {
-    margin-left: 0.2rem;
-    font-size: 0.82rem;
-  }
-
-  .song {
-    border-radius: 15px;
-  }
-
-  .song__button {
-    min-height: 72px;
-    gap: 0.8rem;
-    padding: 0.65rem 0.8rem;
-  }
-
-  .song__number {
-    min-width: 44px;
-    height: 44px;
-    font-size: 0.8rem;
-  }
-
-  .song__title {
-    font-size: 0.95rem;
-  }
-
-  .song__lyrics {
-    margin: 0 0.9rem;
-    padding: 1.35rem 0.2rem 1.7rem;
-    font-size: 0.98rem;
-    line-height: 1.8;
-  }
-
-  .song__stanza {
-    margin-bottom: 1.25rem;
-  }
+  font:
+    5.4pt
+    Arial,
+    Helvetica,
+    sans-serif;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
 
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
+/*
+  ================================================
+  PORTADA
+
+  AQUÍ SE USAN LAS DOS IMÁGENES.
+  ================================================
+*/
+
+.book-cover {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0;
+
+  isolation:
+    isolate;
+
+  color:
+    #FFFFFF;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(
+        53,
+        36,
+        72,
+        .92
+      ),
+      rgba(
+        53,
+        36,
+        72,
+        .84
+      )
+    );
 }
 
-/* Acciones públicas y panel administrativo */
-.public-actions { display:flex; justify-content:flex-end; gap:.65rem; margin-bottom:.85rem; flex-wrap:wrap; }
-.action-button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:.65rem 1rem; color:var(--white); background:var(--purple); border:1px solid var(--purple); border-radius:12px; cursor:pointer; font:700 .78rem Arial,sans-serif; text-decoration:none; text-transform:uppercase; letter-spacing:.04em; }
-.action-button--secondary { color:var(--purple); background:var(--paper); border-color:var(--gold-soft); }
-.action-button--danger { background:#8a3434; border-color:#8a3434; }
-.admin-shell { width:min(100% - 2rem,1180px); margin:0 auto 4rem; }
-.admin-card { padding:clamp(1rem,3vw,2rem); background:rgba(255,251,244,.96); border:1px solid rgba(168,138,68,.32); border-radius:20px; box-shadow:var(--shadow); }
-.admin-login { width:min(100% - 2rem,480px); margin:3rem auto; }
-.admin-title { margin:0 0 1rem; color:var(--purple-dark); }
-.admin-grid { display:grid; grid-template-columns:minmax(300px,.9fr) minmax(380px,1.4fr); gap:1rem; align-items:start; }
-.admin-form { display:grid; gap:.85rem; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
-.form-field { display:grid; gap:.35rem; font:700 .82rem Arial,sans-serif; color:var(--purple-dark); }
-.form-field input,.form-field textarea,.form-field select { width:100%; padding:.75rem; color:var(--text); background:#fff; border:1px solid var(--border); border-radius:10px; font:400 .95rem Arial,sans-serif; }
-.form-field textarea { min-height:260px; resize:vertical; line-height:1.5; }
-.form-actions { display:flex; gap:.6rem; flex-wrap:wrap; }
-.admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
-.admin-list { display:grid; gap:.6rem; max-height:70vh; overflow:auto; padding-right:.25rem; }
-.admin-song { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.75rem; padding:.8rem; background:#fff; border:1px solid var(--border); border-radius:12px; }
-.admin-song__number { color:var(--white); background:var(--purple); border-radius:999px; padding:.35rem .55rem; font:700 .75rem Arial,sans-serif; }
-.admin-song__title { margin:0; color:var(--purple-dark); font-size:.95rem; }
-.admin-song__meta { margin:.1rem 0 0; color:var(--muted); font:.75rem Arial,sans-serif; }
-.admin-song__actions { display:flex; gap:.35rem; }
-.icon-button { padding:.42rem .6rem; border:1px solid var(--gold-soft); border-radius:8px; background:var(--paper); cursor:pointer; font:700 .72rem Arial,sans-serif; }
-.status-message { min-height:1.5em; color:var(--muted); font:.82rem Arial,sans-serif; }
-.status-message.is-error { color:#8a3434; }
-.status-message.is-success { color:#397047; }
-.checkbox-field { display:flex; align-items:center; gap:.5rem; font:700 .82rem Arial,sans-serif; }
-.checkbox-field input { width:auto; }
-[hidden] { display:none !important; }
-@media(max-width:860px){.admin-grid{grid-template-columns:1fr}.admin-list{max-height:none}.form-row{grid-template-columns:1fr}}
+
+/*
+  SANTUARIO =
+  fondo completo de portada.
+*/
+
+.cover-sanctuary {
+  position:
+    absolute;
+
+  z-index:
+    -3;
+
+  inset:
+    0;
+
+  width:
+    100%;
+
+  height:
+    100%;
+
+  object-fit:
+    cover;
+
+  opacity:
+    .30;
+
+  filter:
+    grayscale(.08)
+    contrast(1.05);
+}
+
+
+.cover-overlay {
+  position:
+    absolute;
+
+  z-index:
+    -2;
+
+  inset:
+    0;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(
+        53,
+        36,
+        72,
+        .42
+      ),
+      rgba(
+        30,
+        19,
+        42,
+        .82
+      )
+    );
+}
+
+
+.cover-content {
+  width:
+    88%;
+
+  text-align:
+    center;
+}
+
+.cover-ornament {
+  margin-bottom:
+    2.3mm;
+
+  color:
+    #E2CA89;
+
+  font-size:
+    15pt;
+}
+
+
+/*
+  CAUTIVO =
+  imagen protagonista.
+*/
+
+.cover-cautivo {
+  display:
+    block;
+
+  max-width:
+    48mm;
+
+  max-height:
+    58mm;
+
+  margin:
+    0 auto 3.2mm;
+
+  object-fit:
+    contain;
+
+  filter:
+    drop-shadow(
+      0
+      2mm
+      2.5mm
+      rgba(
+        0,
+        0,
+        0,
+        .25
+      )
+    );
+}
+
+
+.book-cover h1 {
+  margin:
+    0;
+
+  color:
+    #FFFFFF;
+
+  font-size:
+    18pt;
+
+  font-weight:
+    400;
+
+  letter-spacing:
+    .055em;
+
+  line-height:
+    1;
+
+  text-transform:
+    uppercase;
+}
+
+.book-cover h2 {
+  margin:
+    1.6mm 0 0;
+
+  color:
+    #F1E5C4;
+
+  font-size:
+    11.5pt;
+
+  font-weight:
+    400;
+
+  text-transform:
+    uppercase;
+}
+
+.book-cover p {
+  margin:
+    3.4mm 0 0;
+
+  color:
+    #E2CA89;
+
+  font:
+    700 6.3pt
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  letter-spacing:
+    .20em;
+
+  text-transform:
+    uppercase;
+}
+
+.cover-line {
+  width:
+    24mm;
+
+  height:
+    .35mm;
+
+  margin:
+    3.8mm auto 2.8mm;
+
+  background:
+    #D5C18E;
+}
+
+.book-cover small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      .88
+    );
+
+  font:
+    5.8pt
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  letter-spacing:
+    .08em;
+
+  text-transform:
+    uppercase;
+}
+
+
+/*
+  ================================================
+  CANCIONES
+  ================================================
+*/
+
+.song-page {
+  text-align:
+    center;
+
+  padding-top:
+    5.2mm;
+}
+
+.song-heading {
+  display:
+    flex;
+
+  align-items:
+    baseline;
+
+  justify-content:
+    center;
+
+  gap:
+    1.8mm;
+
+  margin:
+    0 0 2mm;
+
+  padding-bottom:
+    1.5mm;
+
+  border-bottom:
+    .35mm solid #D5C18E;
+}
+
+.song-number {
+  flex:
+    none;
+
+  color:
+    #A88A44;
+
+  font-weight:
+    700;
+}
+
+.song-heading h2 {
+  margin:
+    0;
+
+  color:
+    #352448;
+
+  line-height:
+    1.06;
+
+  text-transform:
+    uppercase;
+}
+
+.song-category {
+  margin:
+    -.5mm 0 1.5mm;
+
+  color:
+    #786F66;
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  letter-spacing:
+    .10em;
+
+  text-transform:
+    uppercase;
+}
+
+.song-text {
+  color:
+    #3D3833;
+}
+
+.blank-page {
+  background:
+    #FFFFFF;
+}
+
+
+/*
+  ================================================
+  IMPRESIÓN
+  ================================================
+*/
+
+@media print {
+
+  html,
+  body {
+    width:
+      210mm;
+
+    margin:
+      0;
+
+    padding:
+      0;
+
+    background:
+      #FFFFFF;
+  }
+
+  .no-print {
+    display:
+      none !important;
+  }
+
+  .a4-sheet {
+    margin:
+      0;
+
+    box-shadow:
+      none;
+  }
+
+}
+
+
+@media screen {
+
+  .a4-sheet {
+    box-shadow:
+      0 8px 24px
+      rgba(
+        0,
+        0,
+        0,
+        .15
+      );
+  }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+
+<section
+  class="
+    print-help
+    no-print
+  "
+>
+
+  <h1>
+    Cuadernillo listo para impresión
+  </h1>
+
+  <p>
+
+    El cancionero tiene
+
+    <strong>
+      ${totalPaginas}
+      páginas finales A6
+    </strong>
+
+    distribuidas en
+
+    <strong>
+      ${cantidadHojasA4}
+      hojas físicas A4
+    </strong>.
+
+  </p>
+
+
+  <p>
+
+    Cada A4 contiene
+
+    <strong>
+      4 páginas por delante
+      y 4 por detrás
+    </strong>.
+
+    Haz
+
+    <strong>
+      un único corte horizontal
+    </strong>
+
+    por la línea punteada.
+
+    La línea vertical
+    es únicamente
+    para doblar.
+
+  </p>
+
+
+  <h2>
+    Doble cara automática
+  </h2>
+
+  <p>
+
+    Imprime todas las páginas,
+
+    papel A4,
+
+    escala 100 %,
+
+    doble cara
+
+    y
+
+    <strong>
+      voltear por borde largo
+    </strong>.
+
+  </p>
+
+
+  <h2>
+    Doble cara manual
+  </h2>
+
+  <p>
+
+    Primero imprime
+
+    <strong>
+      impares:
+      1, 3, 5, 7…
+    </strong>.
+
+    Vuelve a colocar
+    las hojas
+
+    y después imprime
+
+    <strong>
+      pares:
+      2, 4, 6, 8…
+    </strong>.
+
+  </p>
+
+
+  <div
+    class="important"
+  >
+
+    <strong>
+      Haz primero una prueba
+      con una sola hoja.
+    </strong>
+
+    Si el reverso
+    sale invertido,
+
+    cambia la orientación
+    con la que vuelves
+    a colocar el papel.
+
+  </div>
+
+
+  <h2>
+    Armado
+  </h2>
+
+  <p>
+
+    1.
+    Corta cada A4
+    solamente
+    por la línea horizontal.
+
+    <br>
+
+    2.
+    Dobla cada mitad
+    por la línea vertical.
+
+    <br>
+
+    3.
+    Anida las hojas
+    desde la exterior
+    hacia la interior.
+
+    <br>
+
+    4.
+    Engrapa
+    sobre el pliegue central.
+
+  </p>
+
+
+  <p>
+
+    En Chrome
+    desactiva
+
+    <strong>
+      Encabezados
+      y pies de página
+    </strong>.
+
+  </p>
+
+
+  <button
+    type="button"
+    onclick="window.print()"
+  >
+
+    Imprimir / Guardar como PDF
+
+  </button>
+
+</section>
+
+
+${hojasImpuestas}
+
+
+/*
+  ================================================
+  AUTOAJUSTE DE LETRA
+  ================================================
+*/
+
+<script>
+
+(function () {
+
+  /*
+    Tamaño mínimo.
+
+    Canciones muy largas.
+  */
+
+  const MIN_BODY =
+    5.8;
+
+
+  /*
+    Tamaño máximo.
+
+    Canciones cortas
+    podrán llegar
+    hasta 13 pt.
+  */
+
+  const MAX_BODY =
+    13.0;
+
+
+  const SAFETY =
+    2;
+
+
+  function aplicarTamano(
+    page,
+    bodyPt
+  ) {
+
+    const text =
+      page.querySelector(
+        ".song-text"
+      );
+
+    const title =
+      page.querySelector(
+        ".song-heading h2"
+      );
+
+    const number =
+      page.querySelector(
+        ".song-number"
+      );
+
+    const category =
+      page.querySelector(
+        ".song-category"
+      );
+
+
+    if (
+      !text ||
+      !title ||
+      !number
+    ) {
+      return;
+    }
+
+
+    let lineHeight;
+
+    if (
+      bodyPt >= 11
+    ) {
+
+      lineHeight =
+        1.30;
+
+    } else if (
+      bodyPt >= 9
+    ) {
+
+      lineHeight =
+        1.27;
+
+    } else if (
+      bodyPt >= 7
+    ) {
+
+      lineHeight =
+        1.22;
+
+    } else {
+
+      lineHeight =
+        1.16;
+
+    }
+
+
+    text.style.fontSize =
+      bodyPt +
+      "pt";
+
+    text.style.lineHeight =
+      String(
+        lineHeight
+      );
+
+
+    const titlePt =
+      Math.min(
+        15.2,
+
+        Math.max(
+          9.8,
+
+          bodyPt *
+            1.20 +
+            1.1
+        )
+      );
+
+
+    title.style.fontSize =
+      titlePt +
+      "pt";
+
+
+    number.style.fontSize =
+      Math.max(
+        8.8,
+
+        titlePt *
+          .80
+      ) +
+      "pt";
+
+
+    if (
+      category
+    ) {
+
+      category.style.fontSize =
+        Math.min(
+          7.8,
+
+          Math.max(
+            5.8,
+
+            bodyPt *
+              .66
+          )
+        ) +
+        "pt";
+
+
+      category.style.lineHeight =
+        "1.1";
+    }
+
+  }
+
+
+  function cabe(page) {
+
+    return (
+      page.scrollHeight <=
+      page.clientHeight +
+      SAFETY
+    );
+
+  }
+
+
+  function ajustarPagina(page) {
+
+    let low =
+      MIN_BODY;
+
+    let high =
+      MAX_BODY;
+
+    let best =
+      MIN_BODY;
+
+
+    aplicarTamano(
+      page,
+      MIN_BODY
+    );
+
+
+    /*
+      Si incluso con
+      el mínimo no cabe,
+      dejamos el mínimo.
+    */
+
+    if (
+      !cabe(page)
+    ) {
+      return;
+    }
+
+
+    /*
+      Búsqueda binaria.
+
+      Encuentra el tamaño
+      máximo que entra.
+    */
+
+    for (
+      let i = 0;
+      i < 16;
+      i += 1
+    ) {
+
+      const mid =
+        (
+          low +
+          high
+        ) /
+        2;
+
+
+      aplicarTamano(
+        page,
+        mid
+      );
+
+
+      if (
+        cabe(page)
+      ) {
+
+        best =
+          mid;
+
+        low =
+          mid;
+
+      } else {
+
+        high =
+          mid;
+
+      }
+
+    }
+
+
+    /*
+      Pequeño margen
+      para evitar
+      cortes por redondeo
+      del navegador.
+    */
+
+    aplicarTamano(
+      page,
+
+      Math.max(
+        MIN_BODY,
+        best - .10
+      )
+    );
+
+  }
+
+
+  /*
+    ==========================================
+    ESPERAR LAS IMÁGENES
+    ==========================================
+
+    Esto asegura que:
+
+    cautivo.png
+    santuario.png
+
+    ya estén cargadas
+    antes de terminar
+    el diseño.
+  */
+
+  async function esperarImagenes() {
+
+    const imagenes =
+      [
+        ...document.images
+      ];
+
+
+    await Promise.all(
+
+      imagenes.map(
+        (img) => {
+
+          if (
+            img.complete
+          ) {
+            return Promise.resolve();
+          }
+
+
+          return new Promise(
+            (resolve) => {
+
+              img.addEventListener(
+                "load",
+                resolve,
+                {
+                  once:
+                    true
+                }
+              );
+
+
+              img.addEventListener(
+                "error",
+                resolve,
+                {
+                  once:
+                    true
+                }
+              );
+
+            }
+          );
+
+        }
+      )
+
+    );
+
+  }
+
+
+  async function iniciar() {
+
+    try {
+
+      if (
+        document.fonts &&
+        document.fonts.ready
+      ) {
+
+        await document
+          .fonts
+          .ready;
+
+      }
+
+    } catch (_) {}
+
+
+    /*
+      Primero cargamos:
+
+      santuario.png
+      cautivo.png
+    */
+
+    await esperarImagenes();
+
+
+    /*
+      Luego calculamos
+      el tamaño de letra
+      óptimo.
+    */
+
+    document
+      .querySelectorAll(
+        ".song-page"
+      )
+      .forEach(
+        ajustarPagina
+      );
+
+  }
+
+
+  window.addEventListener(
+    "load",
+    iniciar,
+    {
+      once:
+        true
+    }
+  );
+
+
+  /*
+    Segundo intento
+    por seguridad
+    en Chrome.
+  */
+
+  setTimeout(
+    iniciar,
+    350
+  );
+
+})();
+
+<\/script>
+
+
+</body>
+
+</html>
+  `);
+
+
+  ventana.document.close();
+
+}
+
+
+generarPdf.addEventListener(
+  "click",
+  generarLibro
+);
+
+
+cargarCanciones();
