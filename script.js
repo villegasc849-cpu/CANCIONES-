@@ -43,7 +43,9 @@ function obtenerEnlaceYoutube(cancion) {
   const separador = enlace.includes("?") ? "&" : "?";
   const inicio = Number(cancion.inicio);
 
-  return inicio > 0 ? `${enlace}${separador}t=${inicio}s` : enlace;
+  return inicio > 0
+    ? `${enlace}${separador}t=${inicio}s`
+    : enlace;
 }
 
 function obtenerVideoYoutube(cancion) {
@@ -71,7 +73,10 @@ function obtenerVideoYoutube(cancion) {
       return null;
     }
 
-    const inicio = Math.max(0, Number(cancion.inicio) || 0);
+    const inicio = Math.max(
+      0,
+      Number(cancion.inicio) || 0
+    );
 
     const parametros = new URLSearchParams({
       rel: "0",
@@ -80,21 +85,27 @@ function obtenerVideoYoutube(cancion) {
     });
 
     if (inicio > 0) {
-      parametros.set("start", String(inicio));
+      parametros.set(
+        "start",
+        String(inicio)
+      );
     }
 
     if (
       window.location.protocol === "http:" ||
       window.location.protocol === "https:"
     ) {
-      parametros.set("origin", window.location.origin);
+      parametros.set(
+        "origin",
+        window.location.origin
+      );
     }
 
     return {
       externo: enlace,
-      embed: `https://www.youtube.com/embed/${encodeURIComponent(
-        videoId
-      )}?${parametros}`
+      embed:
+        `https://www.youtube.com/embed/` +
+        `${encodeURIComponent(videoId)}?${parametros}`
     };
   } catch {
     return null;
@@ -108,92 +119,200 @@ function crearReproductorYoutube(cancion) {
     return null;
   }
 
-  const seccion = document.createElement("section");
-  seccion.className = "song__media";
+  const seccion =
+    document.createElement("section");
 
-  const boton = document.createElement("button");
-  boton.className = "song__video-button";
-  boton.type = "button";
-  boton.textContent = "Ver video";
+  seccion.className =
+    "song__media";
 
-  const contenedor = document.createElement("div");
-  contenedor.className = "song__player";
-  contenedor.hidden = true;
+  const boton =
+    document.createElement("button");
 
-  const ayuda = document.createElement("p");
-  ayuda.className = "song__video-help";
-  ayuda.append("Si el video no se reproduce aquí, ");
+  boton.className =
+    "song__video-button";
 
-  const enlaceExterno = document.createElement("a");
-  enlaceExterno.href = video.externo;
-  enlaceExterno.target = "_blank";
-  enlaceExterno.rel = "noopener noreferrer";
-  enlaceExterno.textContent = "abrir en YouTube";
+  boton.type =
+    "button";
 
-  ayuda.append(enlaceExterno, ".");
+  boton.textContent =
+    "Ver video";
 
-  boton.addEventListener("click", () => {
-    const estaVisible = !contenedor.hidden;
+  const contenedor =
+    document.createElement("div");
 
-    if (estaVisible) {
-      contenedor.replaceChildren();
-      contenedor.classList.remove("song__player--notice");
-      contenedor.hidden = true;
-      boton.textContent = "Ver video";
-      boton.setAttribute("aria-expanded", "false");
-      return;
+  contenedor.className =
+    "song__player";
+
+  contenedor.hidden =
+    true;
+
+  const ayuda =
+    document.createElement("p");
+
+  ayuda.className =
+    "song__video-help";
+
+  ayuda.append(
+    "Si el video no se reproduce aquí, "
+  );
+
+  const enlaceExterno =
+    document.createElement("a");
+
+  enlaceExterno.href =
+    video.externo;
+
+  enlaceExterno.target =
+    "_blank";
+
+  enlaceExterno.rel =
+    "noopener noreferrer";
+
+  enlaceExterno.textContent =
+    "abrir en YouTube";
+
+  ayuda.append(
+    enlaceExterno,
+    "."
+  );
+
+  boton.addEventListener(
+    "click",
+    () => {
+      const estaVisible =
+        !contenedor.hidden;
+
+      if (estaVisible) {
+        contenedor.replaceChildren();
+
+        contenedor.classList.remove(
+          "song__player--notice"
+        );
+
+        contenedor.hidden =
+          true;
+
+        boton.textContent =
+          "Ver video";
+
+        boton.setAttribute(
+          "aria-expanded",
+          "false"
+        );
+
+        return;
+      }
+
+      if (
+        window.location.protocol === "file:"
+      ) {
+        const aviso =
+          document.createElement("div");
+
+        aviso.className =
+          "song__local-video-notice";
+
+        const titulo =
+          document.createElement("strong");
+
+        titulo.textContent =
+          "Vista local";
+
+        const texto =
+          document.createElement("p");
+
+        texto.textContent =
+          "YouTube no permite reproducir videos incrustados al abrir index.html directamente. En GitHub Pages funcionarán dentro de esta sección.";
+
+        const enlace =
+          document.createElement("a");
+
+        enlace.href =
+          video.externo;
+
+        enlace.target =
+          "_blank";
+
+        enlace.rel =
+          "noopener noreferrer";
+
+        enlace.textContent =
+          "Ver ahora en YouTube";
+
+        aviso.append(
+          titulo,
+          texto,
+          enlace
+        );
+
+        contenedor.append(
+          aviso
+        );
+
+        contenedor.classList.add(
+          "song__player--notice"
+        );
+
+        contenedor.hidden =
+          false;
+
+        boton.textContent =
+          "Ocultar aviso";
+
+        boton.setAttribute(
+          "aria-expanded",
+          "true"
+        );
+
+        return;
+      }
+
+      const iframe =
+        document.createElement("iframe");
+
+      iframe.src =
+        video.embed;
+
+      iframe.title =
+        `Video de ${cancion.titulo}`;
+
+      iframe.loading =
+        "lazy";
+
+      iframe.allow =
+        "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+
+      iframe.allowFullscreen =
+        true;
+
+      iframe.referrerPolicy =
+        "origin-when-cross-origin";
+
+      contenedor.classList.remove(
+        "song__player--notice"
+      );
+
+      contenedor.append(
+        iframe
+      );
+
+      contenedor.hidden =
+        false;
+
+      boton.textContent =
+        "Ocultar video";
+
+      boton.setAttribute(
+        "aria-expanded",
+        "true"
+      );
     }
+  );
 
-    if (window.location.protocol === "file:") {
-      const aviso = document.createElement("div");
-      aviso.className = "song__local-video-notice";
-
-      const titulo = document.createElement("strong");
-      titulo.textContent = "Vista local";
-
-      const texto = document.createElement("p");
-      texto.textContent =
-        "YouTube no permite reproducir videos incrustados al abrir index.html directamente. En GitHub Pages funcionarán dentro de esta sección.";
-
-      const enlace = document.createElement("a");
-      enlace.href = video.externo;
-      enlace.target = "_blank";
-      enlace.rel = "noopener noreferrer";
-      enlace.textContent = "Ver ahora en YouTube";
-
-      aviso.append(titulo, texto, enlace);
-      contenedor.append(aviso);
-
-      contenedor.classList.add("song__player--notice");
-      contenedor.hidden = false;
-
-      boton.textContent = "Ocultar aviso";
-      boton.setAttribute("aria-expanded", "true");
-
-      return;
-    }
-
-    const iframe = document.createElement("iframe");
-
-    iframe.src = video.embed;
-    iframe.title = `Video de ${cancion.titulo}`;
-    iframe.loading = "lazy";
-
-    iframe.allow =
-      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-
-    iframe.allowFullscreen = true;
-    iframe.referrerPolicy = "origin-when-cross-origin";
-
-    contenedor.classList.remove("song__player--notice");
-    contenedor.append(iframe);
-    contenedor.hidden = false;
-
-    boton.textContent = "Ocultar video";
-    boton.setAttribute("aria-expanded", "true");
-  });
-
-  boton.setAttribute("aria-expanded", "false");
+  boton.setAttribute(
+    "aria-expanded",
+    "false"
+  );
 
   seccion.append(
     boton,
@@ -205,19 +324,39 @@ function crearReproductorYoutube(cancion) {
 }
 
 function detenerVideoDeCancion(cancion) {
-  const reproductor = cancion.querySelector(".song__player");
-  const boton = cancion.querySelector(".song__video-button");
+  const reproductor =
+    cancion.querySelector(
+      ".song__player"
+    );
 
-  if (!reproductor || !boton) {
+  const boton =
+    cancion.querySelector(
+      ".song__video-button"
+    );
+
+  if (
+    !reproductor ||
+    !boton
+  ) {
     return;
   }
 
   reproductor.replaceChildren();
-  reproductor.classList.remove("song__player--notice");
-  reproductor.hidden = true;
 
-  boton.textContent = "Ver video";
-  boton.setAttribute("aria-expanded", "false");
+  reproductor.classList.remove(
+    "song__player--notice"
+  );
+
+  reproductor.hidden =
+    true;
+
+  boton.textContent =
+    "Ver video";
+
+  boton.setAttribute(
+    "aria-expanded",
+    "false"
+  );
 }
 
 function esIndicacionMusical(linea) {
@@ -227,24 +366,39 @@ function esIndicacionMusical(linea) {
 }
 
 function crearLineaLetra(texto) {
-  const linea = document.createElement("span");
+  const linea =
+    document.createElement("span");
 
-  const patronDestacado = /(\(\s*bis\s*\)|\bbis\b)/gi;
+  const patronDestacado =
+    /(\(\s*bis\s*\)|\bbis\b)/gi;
 
   let posicion = 0;
 
-  if (esIndicacionMusical(texto)) {
-    const destacado = document.createElement("strong");
+  if (
+    esIndicacionMusical(texto)
+  ) {
+    const destacado =
+      document.createElement("strong");
 
-    destacado.className = "song__direction";
-    destacado.textContent = texto;
+    destacado.className =
+      "song__direction";
 
-    linea.append(destacado);
+    destacado.textContent =
+      texto;
+
+    linea.append(
+      destacado
+    );
 
     return linea;
   }
 
-  for (const coincidencia of texto.matchAll(patronDestacado)) {
+  for (
+    const coincidencia
+    of texto.matchAll(
+      patronDestacado
+    )
+  ) {
     linea.append(
       document.createTextNode(
         texto.slice(
@@ -254,12 +408,18 @@ function crearLineaLetra(texto) {
       )
     );
 
-    const destacado = document.createElement("strong");
+    const destacado =
+      document.createElement("strong");
 
-    destacado.className = "song__repeat";
-    destacado.textContent = coincidencia[0];
+    destacado.className =
+      "song__repeat";
 
-    linea.append(destacado);
+    destacado.textContent =
+      coincidencia[0];
+
+    linea.append(
+      destacado
+    );
 
     posicion =
       coincidencia.index +
@@ -280,12 +440,16 @@ function crearEstrofas(texto) {
     document.createDocumentFragment();
 
   const lineas =
-    texto.trim().split(/\r?\n/);
+    texto
+      .trim()
+      .split(/\r?\n/);
 
   let estrofa = [];
 
   function agregarEstrofa() {
-    if (estrofa.length === 0) {
+    if (
+      estrofa.length === 0
+    ) {
       return;
     }
 
@@ -295,45 +459,56 @@ function crearEstrofas(texto) {
     bloque.className =
       "song__stanza";
 
-    estrofa.forEach((linea) => {
-      bloque.append(
-        crearLineaLetra(linea)
-      );
-    });
+    estrofa.forEach(
+      (linea) =>
+        bloque.append(
+          crearLineaLetra(linea)
+        )
+    );
 
-    fragmento.append(bloque);
+    fragmento.append(
+      bloque
+    );
 
     estrofa = [];
   }
 
-  lineas.forEach((lineaOriginal) => {
-    const linea =
-      lineaOriginal.trim();
+  lineas.forEach(
+    (lineaOriginal) => {
+      const linea =
+        lineaOriginal.trim();
 
-    if (!linea) {
-      agregarEstrofa();
-      return;
+      if (!linea) {
+        agregarEstrofa();
+        return;
+      }
+
+      if (
+        esIndicacionMusical(linea)
+      ) {
+        agregarEstrofa();
+
+        estrofa.push(
+          linea
+        );
+
+        agregarEstrofa();
+
+        return;
+      }
+
+      estrofa.push(
+        linea
+      );
+
+      if (
+        /(\(\s*bis\s*\)|\bbis\b)/i.test(linea) ||
+        estrofa.length === 4
+      ) {
+        agregarEstrofa();
+      }
     }
-
-    if (esIndicacionMusical(linea)) {
-      agregarEstrofa();
-
-      estrofa.push(linea);
-
-      agregarEstrofa();
-
-      return;
-    }
-
-    estrofa.push(linea);
-
-    if (
-      /(\(\s*bis\s*\)|\bbis\b)/i.test(linea) ||
-      estrofa.length === 4
-    ) {
-      agregarEstrofa();
-    }
-  });
+  );
 
   agregarEstrofa();
 
@@ -350,15 +525,20 @@ function crearCancion(cancion) {
   const reproductorYoutube =
     crearReproductorYoutube(cancion);
 
-  articulo.className = "song";
+  articulo.className =
+    "song";
+
   articulo.dataset.numero =
     cancion.numero;
 
   const boton =
     document.createElement("button");
 
-  boton.className = "song__button";
-  boton.type = "button";
+  boton.className =
+    "song__button";
+
+  boton.type =
+    "button";
 
   boton.setAttribute(
     "aria-expanded",
@@ -427,17 +607,26 @@ function crearCancion(cancion) {
     "song__lyrics";
 
   letra.append(
-    crearEstrofas(cancion.letra)
+    crearEstrofas(
+      cancion.letra
+    )
   );
 
-  if (reproductorYoutube) {
+  if (
+    reproductorYoutube
+  ) {
     letra.append(
       reproductorYoutube
     );
   }
 
-  contenidoInterior.append(letra);
-  contenido.append(contenidoInterior);
+  contenidoInterior.append(
+    letra
+  );
+
+  contenido.append(
+    contenidoInterior
+  );
 
   articulo.append(
     boton,
@@ -463,27 +652,38 @@ function alternarCancion(
   numeroCancion
 ) {
   const estabaAbierta =
-    cancionAbierta === numeroCancion;
+    cancionAbierta ===
+    numeroCancion;
 
   document
-    .querySelectorAll(".song.is-open")
-    .forEach((cancion) => {
-      detenerVideoDeCancion(cancion);
-
-      cancion.classList.remove(
-        "is-open"
-      );
-
-      cancion
-        .querySelector(".song__button")
-        .setAttribute(
-          "aria-expanded",
-          "false"
+    .querySelectorAll(
+      ".song.is-open"
+    )
+    .forEach(
+      (cancion) => {
+        detenerVideoDeCancion(
+          cancion
         );
-    });
+
+        cancion.classList.remove(
+          "is-open"
+        );
+
+        cancion
+          .querySelector(
+            ".song__button"
+          )
+          .setAttribute(
+            "aria-expanded",
+            "false"
+          );
+      }
+    );
 
   if (estabaAbierta) {
-    cancionAbierta = null;
+    cancionAbierta =
+      null;
+
     return;
   }
 
@@ -502,40 +702,53 @@ function alternarCancion(
 
 function cerrarTodasLasCanciones() {
   document
-    .querySelectorAll(".song.is-open")
-    .forEach((cancion) => {
-      detenerVideoDeCancion(cancion);
-
-      cancion.classList.remove(
-        "is-open"
-      );
-
-      cancion
-        .querySelector(".song__button")
-        .setAttribute(
-          "aria-expanded",
-          "false"
+    .querySelectorAll(
+      ".song.is-open"
+    )
+    .forEach(
+      (cancion) => {
+        detenerVideoDeCancion(
+          cancion
         );
-    });
 
-  cancionAbierta = null;
+        cancion.classList.remove(
+          "is-open"
+        );
+
+        cancion
+          .querySelector(
+            ".song__button"
+          )
+          .setAttribute(
+            "aria-expanded",
+            "false"
+          );
+      }
+    );
+
+  cancionAbierta =
+    null;
 }
 
 function filtrarCanciones() {
   const consulta =
-    normalizarTexto(buscador.value);
+    normalizarTexto(
+      buscador.value
+    );
 
   const resultados =
-    canciones.filter((cancion) => {
-      const contenido =
-        normalizarTexto(
-          `${cancion.numero} ${cancion.titulo} ${cancion.letra}`
-        );
+    canciones.filter(
+      (cancion) => {
+        const contenido =
+          normalizarTexto(
+            `${cancion.numero} ${cancion.titulo} ${cancion.letra}`
+          );
 
-      return contenido.includes(
-        consulta
-      );
-    });
+        return contenido.includes(
+          consulta
+        );
+      }
+    );
 
   renderizarCanciones(
     resultados
@@ -547,7 +760,9 @@ function filtrarCanciones() {
 
 function renderizarCanciones(resultados) {
   listaCanciones.replaceChildren(
-    ...resultados.map(crearCancion)
+    ...resultados.map(
+      crearCancion
+    )
   );
 
   contador.textContent =
@@ -562,10 +777,12 @@ function renderizarCanciones(resultados) {
   if (
     !resultados.some(
       (cancion) =>
-        cancion.numero === cancionAbierta
+        cancion.numero ===
+        cancionAbierta
     )
   ) {
-    cancionAbierta = null;
+    cancionAbierta =
+      null;
   }
 }
 
@@ -577,7 +794,8 @@ buscador.addEventListener(
 limpiarBusqueda.addEventListener(
   "click",
   () => {
-    buscador.value = "";
+    buscador.value =
+      "";
 
     filtrarCanciones();
 
@@ -593,15 +811,20 @@ cerrarTodo.addEventListener(
 async function cargarCanciones() {
   try {
     canciones =
-      await window.CancioneroDB.listSongs();
+      await window
+        .CancioneroDB
+        .listSongs();
 
-    estadoCarga.hidden = true;
+    estadoCarga.hidden =
+      true;
 
     renderizarCanciones(
       canciones
     );
   } catch (error) {
-    console.error(error);
+    console.error(
+      error
+    );
 
     estadoCarga.textContent =
       "No se pudieron cargar las canciones.";
@@ -622,50 +845,16 @@ function escaparHtml(texto) {
   );
 }
 
+/*
+  ======================================================
+  GENERADOR DE CUADERNILLO
+  ======================================================
+*/
+
 function generarLibro() {
   if (!canciones.length) {
     return;
   }
-
-  /*
-    =====================================================
-    FORMATO DEL CUADERNILLO
-    =====================================================
-
-    Papel físico:
-    A4 vertical.
-
-    Cada cara:
-    4 páginas pequeñas.
-
-    DISTRIBUCIÓN:
-
-    ┌─────────────┬─────────────┐
-    │ página      │ página      │
-    │ superior   │ superior    │
-    ├─────────────┼─────────────┤
-    │ página      │ página      │
-    │ inferior   │ inferior    │
-    └─────────────┴─────────────┘
-
-    Se imprime por AMBAS CARAS.
-
-    Después:
-
-    1. Se corta solamente horizontalmente.
-    2. Cada mitad queda como A5 horizontal.
-    3. Se dobla por la mitad vertical.
-    4. Las hojas se meten una dentro de otra.
-    5. Se engrapan por el pliegue central.
-
-    PDF:
-
-    páginas impares =
-    FRENTE de cada A4.
-
-    páginas pares =
-    REVERSO de cada A4.
-  */
 
   const urlCautivo =
     new URL(
@@ -679,42 +868,42 @@ function generarLibro() {
       window.location.href
     ).href;
 
-  function clasePorLongitud(texto) {
-    const longitud =
-      String(texto || "").length;
+  /*
+    Página en blanco.
+  */
 
-    if (longitud > 1250) {
-      return "song--xxl";
-    }
+  const paginaBlanca =
+    () => `
+      <section
+        class="book-page blank-page"
+      ></section>
+    `;
 
-    if (longitud > 1000) {
-      return "song--xl";
-    }
+  /*
+    Página de canción.
 
-    if (longitud > 780) {
-      return "song--long";
-    }
+    IMPORTANTE:
 
-    if (longitud > 560) {
-      return "song--medium";
-    }
+    Ya NO asignamos
+    medium, long, etc.
 
-    return "";
-  }
+    El tamaño será calculado
+    automáticamente después.
+  */
 
-  function paginaCancion(cancion) {
-    return `
+  const paginaCancion =
+    (cancion) => `
       <article
-        class="
-          book-page
-          song-page
-          ${clasePorLongitud(cancion.letra)}
-        "
+        class="book-page song-page"
       >
 
-        <header class="song-heading">
+        <header
+          class="song-heading"
+        >
 
-          <span class="song-number">
+          <span
+            class="song-number"
+          >
             ${escaparHtml(cancion.numero)}
           </span>
 
@@ -727,15 +916,21 @@ function generarLibro() {
         ${
           cancion.categoria
             ? `
-              <p class="song-category">
+              <p
+                class="song-category"
+              >
                 ${escaparHtml(cancion.categoria)}
               </p>
             `
             : ""
         }
 
-        <div class="song-text">
-          ${escaparHtml(cancion.letra).replace(
+        <div
+          class="song-text"
+        >
+          ${escaparHtml(
+            cancion.letra
+          ).replace(
             /\n/g,
             "<br>"
           )}
@@ -743,27 +938,14 @@ function generarLibro() {
 
       </article>
     `;
-  }
-
-  function paginaBlanca() {
-    return `
-      <section
-        class="book-page blank-page"
-      ></section>
-    `;
-  }
 
   /*
-    =========================
+    ======================================================
     PÁGINAS DEL LIBRO
-    =========================
+    ======================================================
   */
 
   const paginas = [
-
-    /*
-      PORTADA
-    */
 
     `
       <section
@@ -780,7 +962,9 @@ function generarLibro() {
           class="cover-overlay"
         ></div>
 
-        <div class="cover-content">
+        <div
+          class="cover-content"
+        >
 
           <div
             class="cover-ornament"
@@ -819,10 +1003,6 @@ function generarLibro() {
       </section>
     `,
 
-    /*
-      CANCIONES
-    */
-
     ...canciones.map(
       paginaCancion
     )
@@ -830,20 +1010,11 @@ function generarLibro() {
   ];
 
   /*
-    =========================================
-    COMPLETAR PÁGINAS PARA IMPRESIÓN
-    =========================================
+    Cada A4 representa
+    8 páginas finales.
 
-    Cada A4 completo contiene:
-
-    4 páginas delante
-    +
-    4 páginas detrás
-
-    = 8 páginas finales.
-
-    Por eso completamos hasta
-    múltiplo de 8.
+    Completamos el libro
+    hasta múltiplo de 8.
   */
 
   while (
@@ -857,46 +1028,16 @@ function generarLibro() {
   const totalPaginas =
     paginas.length;
 
-  /*
-    Una hoja A5 doblada
-    representa 4 páginas.
-  */
-
   const cantidadHojasA5 =
     totalPaginas / 4;
-
-  /*
-    Una A4 contiene
-    dos hojas A5.
-  */
 
   const cantidadHojasA4 =
     cantidadHojasA5 / 2;
 
   /*
-    =========================================
-    IMPOSICIÓN DEL CUADERNILLO
-    =========================================
-
-    Ejemplo:
-
-    8 páginas
-
-    HOJA EXTERIOR
-
-    frente:
-    8 | 1
-
-    reverso:
-    2 | 7
-
-    HOJA INTERIOR
-
-    frente:
-    6 | 3
-
-    reverso:
-    4 | 5
+    ======================================================
+    IMPOSICIÓN
+    ======================================================
   */
 
   const hojasA5 = [];
@@ -906,53 +1047,44 @@ function generarLibro() {
     i < cantidadHojasA5;
     i += 1
   ) {
-    const izquierdaFrente =
-      totalPaginas - (i * 2);
-
-    const derechaFrente =
-      1 + (i * 2);
-
-    const izquierdaReverso =
-      2 + (i * 2);
-
-    const derechaReverso =
-      totalPaginas - 1 - (i * 2);
-
     hojasA5.push({
       frente: [
-        izquierdaFrente,
-        derechaFrente
+        totalPaginas -
+          i * 2,
+
+        1 +
+          i * 2
       ],
 
       reverso: [
-        izquierdaReverso,
-        derechaReverso
+        2 +
+          i * 2,
+
+        totalPaginas -
+          1 -
+          i * 2
       ]
     });
   }
 
   function obtenerPagina(numero) {
-    if (
-      !numero ||
-      numero < 1 ||
-      numero > paginas.length
-    ) {
-      return paginaBlanca();
-    }
-
-    return paginas[
-      numero - 1
-    ];
+    return (
+      paginas[numero - 1] ||
+      paginaBlanca()
+    );
   }
 
   function numeroVisible(numero) {
     /*
-      La portada no muestra número.
+      Página 1 =
+      portada.
+
+      No mostramos
+      numeración.
     */
 
     if (
-      numero <= 1 ||
-      numero > paginas.length
+      numero <= 1
     ) {
       return "";
     }
@@ -977,10 +1109,7 @@ function generarLibro() {
 
     return `
       <section
-        class="
-          half-sheet
-          ${clase}
-        "
+        class="half-sheet ${clase}"
       >
 
         <div
@@ -990,9 +1119,13 @@ function generarLibro() {
           "
         >
 
-          ${obtenerPagina(izquierda)}
+          ${obtenerPagina(
+            izquierda
+          )}
 
-          ${numeroVisible(izquierda)}
+          ${numeroVisible(
+            izquierda
+          )}
 
         </div>
 
@@ -1008,9 +1141,13 @@ function generarLibro() {
           "
         >
 
-          ${obtenerPagina(derecha)}
+          ${obtenerPagina(
+            derecha
+          )}
 
-          ${numeroVisible(derecha)}
+          ${numeroVisible(
+            derecha
+          )}
 
         </div>
 
@@ -1018,41 +1155,39 @@ function generarLibro() {
     `;
   }
 
-  let hojasImpuestas = "";
-
   /*
-    =========================================
-    CREAR CADA HOJA A4
-    =========================================
+    ======================================================
+    CREAR A4
+    ======================================================
   */
+
+  let hojasImpuestas =
+    "";
 
   for (
     let i = 0;
     i < cantidadHojasA4;
     i += 1
   ) {
-    const hojaSuperior =
-      hojasA5[i * 2];
-
-    const hojaInferior =
+    const superior =
       hojasA5[
-        (i * 2) + 1
+        i * 2
+      ];
+
+    const inferior =
+      hojasA5[
+        i * 2 + 1
       ];
 
     /*
-      Cada A4 genera
-      DOS páginas en el PDF.
-
-      Página impar:
+      Página impar del PDF =
       frente.
 
-      Página par:
+      Página par =
       reverso.
     */
 
     hojasImpuestas += `
-
-      <!-- FRENTE A4 -->
 
       <section
         class="
@@ -1062,12 +1197,12 @@ function generarLibro() {
       >
 
         ${crearMitadA5(
-          hojaSuperior.frente,
+          superior.frente,
           "half-sheet--top"
         )}
 
         ${crearMitadA5(
-          hojaInferior.frente,
+          inferior.frente,
           "half-sheet--bottom"
         )}
 
@@ -1081,8 +1216,6 @@ function generarLibro() {
 
       </section>
 
-
-      <!-- REVERSO A4 -->
 
       <section
         class="
@@ -1092,12 +1225,12 @@ function generarLibro() {
       >
 
         ${crearMitadA5(
-          hojaSuperior.reverso,
+          superior.reverso,
           "half-sheet--top"
         )}
 
         ${crearMitadA5(
-          hojaInferior.reverso,
+          inferior.reverso,
           "half-sheet--bottom"
         )}
 
@@ -1110,14 +1243,13 @@ function generarLibro() {
         </div>
 
       </section>
-
     `;
   }
 
   /*
-    =========================================
-    ABRIR VENTANA DE IMPRESIÓN
-    =========================================
+    ======================================================
+    ABRIR VENTANA
+    ======================================================
   */
 
   const ventana =
@@ -1141,1333 +1273,1361 @@ function generarLibro() {
 
 <head>
 
-  <meta charset="utf-8">
+<meta charset="utf-8">
 
-  <meta
-    name="viewport"
-    content="
-      width=device-width,
-      initial-scale=1
-    "
-  >
+<meta
+  name="viewport"
+  content="
+    width=device-width,
+    initial-scale=1
+  "
+>
 
-  <title>
-    Cancionero Señor Cautivo — Cuadernillo
-  </title>
+<title>
+  Cancionero Señor Cautivo — Cuadernillo
+</title>
 
-  <style>
+<style>
+
+  /*
+    ======================================================
+    PAPEL
+    ======================================================
+  */
+
+  @page {
+    size:
+      A4 portrait;
+
+    margin:
+      0;
+  }
+
+  * {
+    box-sizing:
+      border-box;
+  }
+
+  html,
+  body {
+    margin:
+      0;
+
+    padding:
+      0;
+
+    color:
+      #2F2A26;
+
+    background:
+      #ECEAE6;
+
+    font-family:
+      Georgia,
+      "Times New Roman",
+      serif;
+  }
+
+  /*
+    ======================================================
+    INSTRUCCIONES
+    ======================================================
+  */
+
+  .print-help {
+    width:
+      min(
+        92%,
+        940px
+      );
+
+    margin:
+      24px auto;
+
+    padding:
+      24px 28px;
+
+    background:
+      #FFFDF8;
+
+    border:
+      1px solid #D5C18E;
+
+    border-radius:
+      18px;
+
+    box-shadow:
+      0 12px 30px
+      rgba(
+        53,
+        36,
+        72,
+        .10
+      );
+
+    font-family:
+      Arial,
+      Helvetica,
+      sans-serif;
+
+    line-height:
+      1.55;
+  }
+
+  .print-help h1 {
+    margin:
+      0 0 12px;
+
+    color:
+      #352448;
+
+    font-family:
+      Georgia,
+      "Times New Roman",
+      serif;
+
+    font-size:
+      28px;
+  }
+
+  .print-help h2 {
+    margin:
+      22px 0 8px;
+
+    color:
+      #4A3A68;
+
+    font-size:
+      18px;
+  }
+
+  .print-help p {
+    margin:
+      8px 0;
+  }
+
+  .print-help strong {
+    color:
+      #352448;
+  }
+
+  .print-help .important {
+    margin-top:
+      16px;
+
+    padding:
+      13px 15px;
+
+    background:
+      #F5F2EA;
+
+    border-left:
+      4px solid #A88A44;
+
+    border-radius:
+      8px;
+  }
+
+  .print-help button {
+    margin-top:
+      18px;
+
+    padding:
+      12px 20px;
+
+    color:
+      #FFFFFF;
+
+    background:
+      #4A3A68;
+
+    border:
+      0;
+
+    border-radius:
+      10px;
+
+    cursor:
+      pointer;
+
+    font-weight:
+      700;
+
+    font-size:
+      15px;
+  }
+
+  /*
+    ======================================================
+    HOJA A4
+    ======================================================
+  */
+
+  .a4-sheet {
+    position:
+      relative;
+
+    display:
+      grid;
+
+    grid-template-rows:
+      148.5mm
+      148.5mm;
+
+    width:
+      210mm;
+
+    height:
+      297mm;
+
+    margin:
+      0 auto 10mm;
+
+    overflow:
+      hidden;
+
+    background:
+      #FFFFFF;
+
+    break-after:
+      page;
+
+    page-break-after:
+      always;
+  }
+
+  .a4-sheet:last-child {
+    break-after:
+      auto;
+
+    page-break-after:
+      auto;
+  }
+
+  /*
+    CORTE HORIZONTAL.
+  */
+
+  .cut-guide {
+    position:
+      absolute;
+
+    z-index:
+      30;
+
+    top:
+      148.5mm;
+
+    left:
+      0;
+
+    width:
+      210mm;
+
+    height:
+      0;
+
+    border-top:
+      .35mm dashed
+      rgba(
+        0,
+        0,
+        0,
+        .62
+      );
+
+    pointer-events:
+      none;
+  }
+
+  .cut-guide span {
+    position:
+      absolute;
+
+    top:
+      -3.2mm;
+
+    left:
+      3mm;
+
+    padding:
+      0 .8mm;
+
+    color:
+      #555;
+
+    background:
+      #FFFFFF;
+
+    font:
+      5.5pt
+      Arial,
+      Helvetica,
+      sans-serif;
+
+    letter-spacing:
+      .08em;
+  }
+
+  /*
+    ======================================================
+    MITAD A5 HORIZONTAL
+    ======================================================
+  */
+
+  .half-sheet {
+    position:
+      relative;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      105mm
+      105mm;
+
+    width:
+      210mm;
+
+    height:
+      148.5mm;
+
+    overflow:
+      hidden;
+
+    background:
+      #FFFFFF;
+  }
+
+  /*
+    Línea vertical =
+    doblado.
+
+    NO cortar.
+  */
+
+  .fold-guide {
+    position:
+      absolute;
+
+    z-index:
+      20;
+
+    top:
+      0;
+
+    bottom:
+      0;
+
+    left:
+      105mm;
+
+    width:
+      0;
+
+    border-left:
+      .18mm dotted
+      rgba(
+        168,
+        138,
+        68,
+        .42
+      );
+
+    pointer-events:
+      none;
+  }
+
+  /*
+    ======================================================
+    PÁGINA FINAL
+    ======================================================
+  */
+
+  .imposed-page {
+    position:
+      relative;
+
+    width:
+      105mm;
+
+    height:
+      148.5mm;
+
+    overflow:
+      hidden;
+
+    background:
+      #FFFFFF;
+  }
+
+  .book-page {
+    position:
+      relative;
+
+    width:
+      100%;
+
+    height:
+      100%;
+
+    overflow:
+      hidden;
 
     /*
-      ==================================
-      CONFIGURACIÓN DE PAPEL
-      ==================================
+      Reduje ligeramente
+      los márgenes para
+      aprovechar más área.
     */
 
-    @page {
+    padding:
+      6.5mm
+      6mm
+      8mm;
 
-      size:
-        A4 portrait;
+    background:
+      #FFFFFF;
+  }
 
-      margin:
-        0;
+  .printed-page-number {
+    position:
+      absolute;
 
-    }
+    z-index:
+      10;
 
-    * {
+    right:
+      0;
 
-      box-sizing:
-        border-box;
+    bottom:
+      2.5mm;
 
-    }
+    left:
+      0;
 
-    html,
-    body {
+    color:
+      #80766D;
 
-      margin:
-        0;
+    text-align:
+      center;
 
-      padding:
-        0;
+    font:
+      5.5pt
+      Arial,
+      Helvetica,
+      sans-serif;
+  }
 
-      color:
-        #2F2A26;
+  /*
+    ======================================================
+    PORTADA
+    ======================================================
+  */
 
-      background:
-        #ECEAE6;
+  .book-cover {
+    display:
+      flex;
 
-      font-family:
-        Georgia,
-        "Times New Roman",
-        serif;
+    align-items:
+      center;
 
-    }
+    justify-content:
+      center;
 
-    /*
-      ==================================
-      INSTRUCCIONES
-      NO SE IMPRIMEN
-      ==================================
-    */
+    padding:
+      0;
 
-    .print-help {
+    isolation:
+      isolate;
 
-      width:
-        min(
-          92%,
-          940px
-        );
+    color:
+      #FFFFFF;
 
-      margin:
-        24px auto;
-
-      padding:
-        24px 28px;
-
-      color:
-        #2F2A26;
-
-      background:
-        #FFFDF8;
-
-      border:
-        1px solid
-        #D5C18E;
-
-      border-radius:
-        18px;
-
-      box-shadow:
-        0 12px 30px
+    background:
+      linear-gradient(
+        180deg,
         rgba(
           53,
           36,
           72,
-          .10
-        );
+          .92
+        ),
+        rgba(
+          53,
+          36,
+          72,
+          .84
+        )
+      );
+  }
 
-      font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
+  .cover-sanctuary {
+    position:
+      absolute;
 
-      line-height:
-        1.55;
+    z-index:
+      -3;
 
-    }
+    inset:
+      0;
 
-    .print-help h1 {
+    width:
+      100%;
+
+    height:
+      100%;
+
+    object-fit:
+      cover;
+
+    opacity:
+      .28;
+
+    filter:
+      grayscale(.12)
+      contrast(1.05);
+  }
+
+  .cover-overlay {
+    position:
+      absolute;
+
+    z-index:
+      -2;
+
+    inset:
+      0;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(
+          53,
+          36,
+          72,
+          .50
+        ),
+        rgba(
+          30,
+          19,
+          42,
+          .86
+        )
+      );
+  }
+
+  .cover-content {
+    width:
+      86%;
+
+    text-align:
+      center;
+  }
+
+  .cover-ornament {
+    margin-bottom:
+      2.5mm;
+
+    color:
+      #E2CA89;
+
+    font-size:
+      15pt;
+  }
+
+  .cover-cautivo {
+    display:
+      block;
+
+    max-width:
+      45mm;
+
+    max-height:
+      55mm;
+
+    margin:
+      0 auto 3.5mm;
+
+    object-fit:
+      contain;
+
+    filter:
+      drop-shadow(
+        0
+        2mm
+        2.5mm
+        rgba(
+          0,
+          0,
+          0,
+          .25
+        )
+      );
+  }
+
+  .book-cover h1 {
+    margin:
+      0;
+
+    color:
+      #FFFFFF;
+
+    font-size:
+      18pt;
+
+    font-weight:
+      400;
+
+    letter-spacing:
+      .055em;
+
+    line-height:
+      1;
+
+    text-transform:
+      uppercase;
+  }
+
+  .book-cover h2 {
+    margin:
+      1.6mm 0 0;
+
+    color:
+      #F1E5C4;
+
+    font-size:
+      11.5pt;
+
+    font-weight:
+      400;
+
+    text-transform:
+      uppercase;
+  }
+
+  .book-cover p {
+    margin:
+      3.6mm 0 0;
+
+    color:
+      #E2CA89;
+
+    font:
+      700 6.3pt
+      Arial,
+      Helvetica,
+      sans-serif;
+
+    letter-spacing:
+      .20em;
+
+    text-transform:
+      uppercase;
+  }
+
+  .cover-line {
+    width:
+      24mm;
+
+    height:
+      .35mm;
+
+    margin:
+      4mm auto 3mm;
+
+    background:
+      #D5C18E;
+  }
+
+  .book-cover small {
+    color:
+      rgba(
+        255,
+        255,
+        255,
+        .88
+      );
+
+    font:
+      5.8pt
+      Arial,
+      Helvetica,
+      sans-serif;
+
+    letter-spacing:
+      .08em;
+
+    text-transform:
+      uppercase;
+  }
+
+  /*
+    ======================================================
+    CANCIONES
+    ======================================================
+  */
+
+  .song-page {
+    text-align:
+      center;
+  }
+
+  .song-heading {
+    display:
+      flex;
+
+    align-items:
+      baseline;
+
+    justify-content:
+      center;
+
+    gap:
+      2mm;
+
+    margin:
+      0 0 2.5mm;
+
+    padding-bottom:
+      1.8mm;
+
+    border-bottom:
+      .35mm solid #D5C18E;
+  }
+
+  .song-number {
+    flex:
+      none;
+
+    color:
+      #A88A44;
+
+    font-weight:
+      700;
+  }
+
+  .song-heading h2 {
+    margin:
+      0;
+
+    color:
+      #352448;
+
+    line-height:
+      1.08;
+
+    text-transform:
+      uppercase;
+  }
+
+  .song-category {
+    margin:
+      -.8mm 0 1.8mm;
+
+    color:
+      #786F66;
+
+    font-family:
+      Arial,
+      Helvetica,
+      sans-serif;
+
+    letter-spacing:
+      .10em;
+
+    text-transform:
+      uppercase;
+  }
+
+  .song-text {
+    color:
+      #3D3833;
+  }
+
+  .blank-page {
+    background:
+      #FFFFFF;
+  }
+
+  /*
+    ======================================================
+    IMPRESIÓN
+    ======================================================
+  */
+
+  @media print {
+    html,
+    body {
+      width:
+        210mm;
 
       margin:
-        0 0 12px;
-
-      color:
-        #352448;
-
-      font-family:
-        Georgia,
-        "Times New Roman",
-        serif;
-
-      font-size:
-        28px;
-
-    }
-
-    .print-help h2 {
-
-      margin:
-        22px 0 8px;
-
-      color:
-        #4A3A68;
-
-      font-size:
-        18px;
-
-    }
-
-    .print-help p {
-
-      margin:
-        8px 0;
-
-    }
-
-    .print-help strong {
-
-      color:
-        #352448;
-
-    }
-
-    .print-help .important {
-
-      margin-top:
-        16px;
-
-      padding:
-        13px 15px;
-
-      background:
-        #F5F2EA;
-
-      border-left:
-        4px solid
-        #A88A44;
-
-      border-radius:
-        8px;
-
-    }
-
-    .print-help button {
-
-      margin-top:
-        18px;
-
-      padding:
-        12px 20px;
-
-      color:
-        #FFFFFF;
-
-      background:
-        #4A3A68;
-
-      border:
         0;
 
-      border-radius:
-        10px;
+      padding:
+        0;
 
-      cursor:
-        pointer;
-
-      font-weight:
-        700;
-
-      font-size:
-        15px;
-
+      background:
+        #FFFFFF;
     }
 
-    /*
-      ==================================
-      HOJA FÍSICA A4
-      ==================================
-    */
+    .no-print {
+      display:
+        none !important;
+    }
 
     .a4-sheet {
-
-      position:
-        relative;
-
-      display:
-        grid;
-
-      grid-template-rows:
-        148.5mm
-        148.5mm;
-
-      width:
-        210mm;
-
-      height:
-        297mm;
-
       margin:
-        0 auto 10mm;
-
-      overflow:
-        hidden;
-
-      background:
-        #FFFFFF;
-
-      break-after:
-        page;
-
-      page-break-after:
-        always;
-
-    }
-
-    .a4-sheet:last-child {
-
-      break-after:
-        auto;
-
-      page-break-after:
-        auto;
-
-    }
-
-    /*
-      ==================================
-      LÍNEA HORIZONTAL DE CORTE
-      ==================================
-    */
-
-    .cut-guide {
-
-      position:
-        absolute;
-
-      z-index:
-        30;
-
-      top:
-        148.5mm;
-
-      left:
         0;
 
-      width:
-        210mm;
+      box-shadow:
+        none;
+    }
+  }
 
-      height:
-        0;
-
-      border-top:
-        .35mm dashed
+  @media screen {
+    .a4-sheet {
+      box-shadow:
+        0 8px 24px
         rgba(
           0,
           0,
           0,
-          .62
+          .15
         );
-
-      pointer-events:
-        none;
-
     }
+  }
 
-    .cut-guide span {
-
-      position:
-        absolute;
-
-      top:
-        -3.2mm;
-
-      left:
-        3mm;
-
-      padding:
-        0 .8mm;
-
-      color:
-        #555;
-
-      background:
-        #FFF;
-
-      font:
-        5.5pt
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      letter-spacing:
-        .08em;
-
-    }
-
-    /*
-      ==================================
-      CADA MITAD A5
-      ==================================
-    */
-
-    .half-sheet {
-
-      position:
-        relative;
-
-      display:
-        grid;
-
-      grid-template-columns:
-        105mm
-        105mm;
-
-      width:
-        210mm;
-
-      height:
-        148.5mm;
-
-      overflow:
-        hidden;
-
-      background:
-        #FFFFFF;
-
-    }
-
-    /*
-      Línea vertical:
-      SOLO DOBLEZ.
-
-      NO CORTAR.
-    */
-
-    .fold-guide {
-
-      position:
-        absolute;
-
-      z-index:
-        20;
-
-      top:
-        0;
-
-      bottom:
-        0;
-
-      left:
-        105mm;
-
-      width:
-        0;
-
-      border-left:
-        .18mm dotted
-        rgba(
-          168,
-          138,
-          68,
-          .42
-        );
-
-      pointer-events:
-        none;
-
-    }
-
-    /*
-      ==================================
-      PÁGINA FINAL A6
-      ==================================
-    */
-
-    .imposed-page {
-
-      position:
-        relative;
-
-      width:
-        105mm;
-
-      height:
-        148.5mm;
-
-      overflow:
-        hidden;
-
-      background:
-        #FFFFFF;
-
-    }
-
-    .imposed-page--left {
-
-      grid-column:
-        1;
-
-    }
-
-    .imposed-page--right {
-
-      grid-column:
-        2;
-
-    }
-
-    .book-page {
-
-      position:
-        relative;
-
-      width:
-        100%;
-
-      height:
-        100%;
-
-      overflow:
-        hidden;
-
-      padding:
-        7mm
-        6.5mm
-        8mm;
-
-      background:
-        #FFFFFF;
-
-    }
-
-    /*
-      ==================================
-      NÚMERO DE PÁGINA
-      ==================================
-    */
-
-    .printed-page-number {
-
-      position:
-        absolute;
-
-      z-index:
-        10;
-
-      right:
-        0;
-
-      bottom:
-        2.6mm;
-
-      left:
-        0;
-
-      color:
-        #80766D;
-
-      text-align:
-        center;
-
-      font:
-        5.4pt
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    }
-
-    /*
-      ==================================
-      PORTADA
-      ==================================
-    */
-
-    .book-cover {
-
-      display:
-        flex;
-
-      align-items:
-        center;
-
-      justify-content:
-        center;
-
-      padding:
-        0;
-
-      isolation:
-        isolate;
-
-      color:
-        #FFFFFF;
-
-      background:
-        linear-gradient(
-          180deg,
-          rgba(
-            53,
-            36,
-            72,
-            .92
-          ),
-          rgba(
-            53,
-            36,
-            72,
-            .84
-          )
-        );
-
-    }
-
-    .cover-sanctuary {
-
-      position:
-        absolute;
-
-      z-index:
-        -3;
-
-      inset:
-        0;
-
-      width:
-        100%;
-
-      height:
-        100%;
-
-      object-fit:
-        cover;
-
-      opacity:
-        .28;
-
-      filter:
-        grayscale(.12)
-        contrast(1.05);
-
-    }
-
-    .cover-overlay {
-
-      position:
-        absolute;
-
-      z-index:
-        -2;
-
-      inset:
-        0;
-
-      background:
-        linear-gradient(
-          180deg,
-          rgba(
-            53,
-            36,
-            72,
-            .50
-          ),
-          rgba(
-            30,
-            19,
-            42,
-            .86
-          )
-        );
-
-    }
-
-    .cover-content {
-
-      width:
-        86%;
-
-      text-align:
-        center;
-
-    }
-
-    .cover-ornament {
-
-      margin-bottom:
-        2.5mm;
-
-      color:
-        #E2CA89;
-
-      font-size:
-        15pt;
-
-    }
-
-    .cover-cautivo {
-
-      display:
-        block;
-
-      max-width:
-        45mm;
-
-      max-height:
-        55mm;
-
-      margin:
-        0 auto 3.5mm;
-
-      object-fit:
-        contain;
-
-      filter:
-        drop-shadow(
-          0
-          2mm
-          2.5mm
-          rgba(
-            0,
-            0,
-            0,
-            .25
-          )
-        );
-
-    }
-
-    .book-cover h1 {
-
-      margin:
-        0;
-
-      color:
-        #FFFFFF;
-
-      font-size:
-        18pt;
-
-      font-weight:
-        400;
-
-      letter-spacing:
-        .055em;
-
-      line-height:
-        1;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    .book-cover h2 {
-
-      margin:
-        1.6mm 0 0;
-
-      color:
-        #F1E5C4;
-
-      font-size:
-        11.5pt;
-
-      font-weight:
-        400;
-
-      letter-spacing:
-        .025em;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    .book-cover p {
-
-      margin:
-        3.6mm 0 0;
-
-      color:
-        #E2CA89;
-
-      font:
-        6.3pt
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      font-weight:
-        700;
-
-      letter-spacing:
-        .20em;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    .cover-line {
-
-      width:
-        24mm;
-
-      height:
-        .35mm;
-
-      margin:
-        4mm auto 3mm;
-
-      background:
-        #D5C18E;
-
-    }
-
-    .book-cover small {
-
-      color:
-        rgba(
-          255,
-          255,
-          255,
-          .88
-        );
-
-      font:
-        5.8pt
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      letter-spacing:
-        .08em;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    /*
-      ==================================
-      CANCIONES
-      ==================================
-    */
-
-    .song-page {
-
-      text-align:
-        center;
-
-    }
-
-    .song-heading {
-
-      display:
-        flex;
-
-      align-items:
-        baseline;
-
-      justify-content:
-        center;
-
-      gap:
-        2mm;
-
-      margin:
-        0 0 2.7mm;
-
-      padding-bottom:
-        2mm;
-
-      border-bottom:
-        .35mm solid
-        #D5C18E;
-
-    }
-
-    .song-number {
-
-      flex:
-        none;
-
-      color:
-        #A88A44;
-
-      font-size:
-        9pt;
-
-      font-weight:
-        700;
-
-    }
-
-    .song-heading h2 {
-
-      margin:
-        0;
-
-      color:
-        #352448;
-
-      font-size:
-        10.2pt;
-
-      line-height:
-        1.12;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    .song-category {
-
-      margin:
-        -1mm 0 2mm;
-
-      color:
-        #786F66;
-
-      font:
-        5.3pt
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      letter-spacing:
-        .10em;
-
-      text-transform:
-        uppercase;
-
-    }
-
-    .song-text {
-
-      color:
-        #3D3833;
-
-      font-size:
-        7.05pt;
-
-      line-height:
-        1.30;
-
-    }
-
-    .song--medium .song-text {
-
-      font-size:
-        6.55pt;
-
-      line-height:
-        1.23;
-
-    }
-
-    .song--long .song-text {
-
-      font-size:
-        5.95pt;
-
-      line-height:
-        1.17;
-
-    }
-
-    .song--xl .song-text {
-
-      font-size:
-        5.35pt;
-
-      line-height:
-        1.10;
-
-    }
-
-    .song--xxl .song-text {
-
-      font-size:
-        4.85pt;
-
-      line-height:
-        1.04;
-
-    }
-
-    .song--xl .song-heading,
-    .song--xxl .song-heading {
-
-      margin-bottom:
-        1.7mm;
-
-      padding-bottom:
-        1.4mm;
-
-    }
-
-    .song--xl .song-heading h2,
-    .song--xxl .song-heading h2 {
-
-      font-size:
-        8.8pt;
-
-    }
-
-    .blank-page {
-
-      background:
-        #FFFFFF;
-
-    }
-
-    /*
-      ==================================
-      IMPRESIÓN
-      ==================================
-    */
-
-    @media print {
-
-      html,
-      body {
-
-        width:
-          210mm;
-
-        margin:
-          0;
-
-        padding:
-          0;
-
-        background:
-          #FFFFFF;
-
-      }
-
-      .no-print {
-
-        display:
-          none !important;
-
-      }
-
-      .a4-sheet {
-
-        margin:
-          0;
-
-        box-shadow:
-          none;
-
-      }
-
-    }
-
-    @media screen {
-
-      .a4-sheet {
-
-        box-shadow:
-          0 8px 24px
-          rgba(
-            0,
-            0,
-            0,
-            .15
-          );
-
-      }
-
-    }
-
-  </style>
+</style>
 
 </head>
 
 <body>
 
-  <!--
-    ==================================
-    INSTRUCCIONES
-    ==================================
-  -->
+<section
+  class="
+    print-help
+    no-print
+  "
+>
 
-  <section
-    class="
-      print-help
-      no-print
-    "
+  <h1>
+    Cuadernillo listo para impresión
+  </h1>
+
+  <p>
+
+    El cancionero tiene
+
+    <strong>
+      ${totalPaginas}
+      páginas finales A6
+    </strong>
+
+    distribuidas en
+
+    <strong>
+      ${cantidadHojasA4}
+      hojas físicas A4
+    </strong>.
+
+  </p>
+
+  <p>
+
+    Cada A4 contiene
+
+    <strong>
+      4 páginas por delante
+      y 4 por detrás
+    </strong>.
+
+    Después de imprimir
+    haz
+
+    <strong>
+      un único corte horizontal
+    </strong>
+
+    por la línea punteada.
+
+    La línea vertical
+    es solamente para doblar.
+
+  </p>
+
+  <h2>
+    Doble cara automática
+  </h2>
+
+  <p>
+
+    Imprime todas las páginas,
+
+    papel A4,
+
+    escala 100 %,
+
+    doble cara
+
+    y
+
+    <strong>
+      voltear por borde largo
+    </strong>.
+
+  </p>
+
+  <h2>
+    Doble cara manual
+  </h2>
+
+  <p>
+
+    Primero imprime
+    las páginas
+
+    <strong>
+      impares:
+      1, 3, 5, 7…
+    </strong>.
+
+    Vuelve a colocar
+    las hojas
+
+    y luego imprime
+
+    <strong>
+      pares:
+      2, 4, 6, 8…
+    </strong>.
+
+  </p>
+
+  <div
+    class="important"
   >
 
-    <h1>
-      Cuadernillo listo para impresión
-    </h1>
+    <strong>
+      Haz una prueba
+      con una sola hoja
+      antes de imprimir todo.
+    </strong>
 
-    <p>
+    Si el reverso
+    sale invertido,
 
-      El cancionero tiene
+    cambia la orientación
+    con la que vuelves
+    a colocar el papel.
 
-      <strong>
-        ${totalPaginas}
-        páginas finales A6
-      </strong>
+  </div>
 
-      distribuidas en
+  <h2>
+    Armado
+  </h2>
 
-      <strong>
-        ${cantidadHojasA4}
-        hojas físicas A4
-      </strong>.
+  <p>
 
-    </p>
+    1.
+    Corta cada A4
+    por la línea horizontal.
 
-    <p>
+    <br>
 
-      Cada A4 contiene
+    2.
+    Dobla cada mitad
+    por la línea vertical.
 
-      <strong>
-        4 páginas por delante
-        y 4 por detrás
-      </strong>.
+    <br>
 
-      Después de imprimir
-      solamente debes hacer
+    3.
+    Ordena y anida
+    las hojas.
 
-      <strong>
-        UN corte horizontal
-        por la mitad
-      </strong>
+    <br>
 
-      de cada A4.
+    4.
+    Engrapa sobre
+    el pliegue central.
 
-    </p>
+  </p>
 
-    <p>
+  <p>
 
-      La línea horizontal
-      punteada indica el corte.
+    En Chrome desactiva
 
-      La línea vertical central
-      solamente indica
-      dónde doblar.
+    <strong>
+      Encabezados
+      y pies de página
+    </strong>.
 
-    </p>
+  </p>
 
+  <button
+    type="button"
+    onclick="window.print()"
+  >
 
-    <h2>
-      Impresora con doble cara automática
-    </h2>
+    Imprimir / Guardar como PDF
 
-    <p>
+  </button>
 
-      Imprime
+</section>
 
-      <strong>
-        TODAS las páginas
-      </strong>.
+${hojasImpuestas}
 
-    </p>
 
-    <p>
+/*
+  ======================================================
+  AUTOAJUSTE DEL TAMAÑO DE LETRA
+  ======================================================
 
-      Activa
+  Esta es la parte nueva.
 
-      <strong>
-        impresión a doble cara
-      </strong>.
+  Para cada canción:
 
-    </p>
+  - comienza con un tamaño pequeño;
+  - aumenta progresivamente;
+  - comprueba si sigue entrando;
+  - encuentra el mayor tamaño
+    que cabe dentro de la página.
 
-    <p>
+  De esta forma:
 
-      Selecciona:
+  canción corta =
+  letra grande.
 
-      <strong>
-        Voltear por borde largo
-      </strong>.
+  canción larga =
+  letra más pequeña.
+*/
 
-    </p>
+<script>
 
-    <p>
+(function () {
 
-      Papel:
+  /*
+    Tamaño mínimo.
 
-      <strong>
-        A4
-      </strong>.
+    Solo se utilizará
+    en canciones
+    realmente largas.
+  */
+
+  const MIN_BODY =
+    6.0;
 
-      Escala:
+  /*
+    Tamaño máximo.
 
-      <strong>
-        100 %
-      </strong>.
+    Canciones cortas
+    pueden llegar
+    hasta 11.2 pt.
 
-    </p>
+    Si después quieres
+    todavía más grande,
+    puedes poner 12.
+  */
 
+  const MAX_BODY =
+    11.2;
 
-    <h2>
-      Impresora sin doble cara automática
-    </h2>
+  /*
+    Pequeño margen
+    de tolerancia.
+  */
 
-    <p>
+  const SAFETY =
+    2;
 
-      Este archivo está preparado
-      especialmente para hacerlo
-      manualmente.
 
-    </p>
+  function aplicarTamano(
+    page,
+    bodyPt
+  ) {
+
+    const text =
+      page.querySelector(
+        ".song-text"
+      );
+
+    const title =
+      page.querySelector(
+        ".song-heading h2"
+      );
 
-    <p>
+    const number =
+      page.querySelector(
+        ".song-number"
+      );
 
-      Las
+    const category =
+      page.querySelector(
+        ".song-category"
+      );
+
+
+    /*
+      INTERLINEADO DINÁMICO.
 
-      <strong>
-        páginas IMPARES
-        del PDF
-      </strong>
+      A mayor letra,
+      damos un poco
+      más de aire.
+    */
 
-      son todos los
+    let lineHeight;
 
-      <strong>
-        FRENTES
-      </strong>.
+    if (
+      bodyPt >= 10
+    ) {
+      lineHeight =
+        1.34;
+    } else if (
+      bodyPt >= 8
+    ) {
+      lineHeight =
+        1.29;
+    } else {
+      lineHeight =
+        1.22;
+    }
 
-    </p>
 
-    <p>
+    text.style.fontSize =
+      bodyPt + "pt";
 
-      Las
+    text.style.lineHeight =
+      lineHeight;
 
-      <strong>
-        páginas PARES
-        del PDF
-      </strong>
 
-      son todos los
+    /*
+      Título proporcional
+      al tamaño de la letra.
+    */
 
-      <strong>
-        REVERSOS
-      </strong>.
+    const titlePt =
+      Math.min(
+        14.2,
+        Math.max(
+          9.5,
+          bodyPt * 1.28 + 1.2
+        )
+      );
 
-    </p>
 
-    <p>
+    title.style.fontSize =
+      titlePt + "pt";
 
-      Primera pasada:
 
-      <strong>
-        imprime
-        1, 3, 5, 7, 9…
-      </strong>
+    number.style.fontSize =
+      Math.max(
+        8.8,
+        titlePt * .82
+      ) + "pt";
 
-    </p>
 
-    <p>
+    /*
+      Categoría:
+      huayno,
+      cumbia,
+      etc.
+    */
 
-      Después vuelve
-      a colocar esas hojas
-      en la impresora.
+    if (category) {
 
-    </p>
+      const categoryPt =
+        Math.min(
+          7.3,
+          Math.max(
+            5.8,
+            bodyPt * .68
+          )
+        );
 
-    <p>
+      category.style.fontSize =
+        categoryPt + "pt";
 
-      Segunda pasada:
+      category.style.lineHeight =
+        "1.15";
+    }
+  }
 
-      <strong>
-        imprime
-        2, 4, 6, 8, 10…
-      </strong>
 
-    </p>
+  /*
+    Comprueba si
+    todo sigue entrando
+    dentro de la página.
+  */
 
+  function cabe(page) {
 
-    <div class="important">
+    return (
+      page.scrollHeight <=
+      page.clientHeight +
+      SAFETY
+    );
+  }
 
-      <strong>
-        IMPORTANTE:
-      </strong>
 
-      antes de imprimir
-      todo el cancionero,
+  /*
+    Búsqueda binaria.
 
-      haz una prueba
-      solamente con
-      la primera hoja física.
+    En vez de probar
+    tamaño por tamaño,
+    encuentra rápidamente
+    el máximo posible.
+  */
 
-      Cada impresora
-      introduce el papel
-      de manera diferente.
+  function ajustarPagina(page) {
 
-      Si el reverso
-      aparece de cabeza,
+    let low =
+      MIN_BODY;
 
-      cambia la orientación
-      con la que colocas
-      nuevamente las hojas.
+    let high =
+      MAX_BODY;
 
-    </div>
+    let best =
+      MIN_BODY;
 
 
-    <h2>
-      Después de imprimir
-    </h2>
+    /*
+      Empezamos
+      desde el mínimo.
+    */
 
-    <p>
+    aplicarTamano(
+      page,
+      low
+    );
 
-      1.
-      Mantén las hojas A4
-      en orden.
 
-      <br>
+    /*
+      14 repeticiones
+      dan precisión
+      de sobra.
+    */
 
-      2.
-      Corta cada A4
-      únicamente por
-      la línea horizontal
-      central.
+    for (
+      let i = 0;
+      i < 14;
+      i += 1
+    ) {
 
-      <br>
+      const mid =
+        (low + high) / 2;
 
-      3.
-      Obtendrás dos mitades
-      A5 horizontales
-      por cada A4.
 
-      <br>
+      aplicarTamano(
+        page,
+        mid
+      );
 
-      4.
-      Ordena las hojas
-      desde la exterior
-      hacia la interior.
 
-      <br>
+      if (
+        cabe(page)
+      ) {
 
-      5.
-      Dobla cada mitad
-      por la línea vertical.
+        best =
+          mid;
 
-      <br>
+        low =
+          mid;
 
-      6.
-      Mete unas hojas
-      dentro de las otras.
+      } else {
 
-      <br>
+        high =
+          mid;
+      }
+    }
 
-      7.
-      Engrapa exactamente
-      sobre el pliegue
-      vertical central.
 
-    </p>
+    /*
+      Restamos una mínima
+      cantidad para evitar
+      que una diferencia
+      del navegador
+      corte la última línea.
+    */
 
+    aplicarTamano(
+      page,
+      Math.max(
+        MIN_BODY,
+        best - .08
+      )
+    );
+  }
 
-    <p>
 
-      En Chrome
-      desactiva:
+  function ajustarTodas() {
 
-      <strong>
-        Encabezados y pies
-        de página
-      </strong>.
+    document
+      .querySelectorAll(
+        ".song-page"
+      )
+      .forEach(
+        ajustarPagina
+      );
+  }
 
-    </p>
 
+  /*
+    Esperamos a que
+    las fuentes estén listas
+    antes de medir.
+  */
 
-    <button
-      type="button"
-      onclick="window.print()"
-    >
+  async function iniciar() {
 
-      Imprimir / Guardar como PDF
+    if (
+      document.fonts &&
+      document.fonts.ready
+    ) {
+      try {
 
-    </button>
+        await document
+          .fonts
+          .ready;
 
-  </section>
+      } catch (_) {
+        // No pasa nada.
+      }
+    }
 
 
-  <!--
-    ==================================
-    HOJAS DEL CUADERNILLO
-    ==================================
-  -->
+    ajustarTodas();
+  }
 
-  ${hojasImpuestas}
+
+  /*
+    Ejecutamos al cargar.
+  */
+
+  window.addEventListener(
+    "load",
+    iniciar,
+    {
+      once: true
+    }
+  );
+
+
+  /*
+    Segunda ejecución
+    por seguridad,
+    especialmente
+    en Chrome.
+  */
+
+  setTimeout(
+    iniciar,
+    250
+  );
+
+})();
+
+<\/script>
+
 
 </body>
 
@@ -2477,10 +2637,11 @@ function generarLibro() {
   ventana.document.close();
 }
 
+
 /*
-  =========================================
+  ======================================================
   BOTÓN PDF
-  =========================================
+  ======================================================
 */
 
 generarPdf.addEventListener(
@@ -2488,10 +2649,11 @@ generarPdf.addEventListener(
   generarLibro
 );
 
+
 /*
-  =========================================
+  ======================================================
   CARGAR CANCIONES
-  =========================================
+  ======================================================
 */
 
 cargarCanciones();
