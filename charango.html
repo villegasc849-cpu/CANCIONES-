@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Charango · Cancionero Musical</title>
+  <link rel="stylesheet" href="musica.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-cross">✝</div><strong>Señor Cautivo</strong><span>Cancionero musical</span></div>
+    <nav class="side-nav"><a href="index.html">♫ Canciones</a><a class="active" href="charango.html">🪕 Charango</a><a href="zampona.html">▥ Zampoña</a></nav>
+    <div class="sidebar-foot">Registro musical</div>
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div><p class="eyebrow">Módulo de instrumento</p><h1>Charango · Registro de acordes</h1></div>
+      <div class="top-controls">
+        <label><span>Canción</span><select id="songSelect"></select></label>
+        <label><span>Tonalidad</span><select id="keySelect"><option value="C">Do (C)</option><option value="C#">Do# (C#)</option><option value="D">Re (D)</option><option value="Eb">Mib (Eb)</option><option value="E">Mi (E)</option><option value="F">Fa (F)</option><option value="F#">Fa# (F#)</option><option value="G" selected>Sol (G)</option><option value="Ab">Lab (Ab)</option><option value="A">La (A)</option><option value="Bb">Sib (Bb)</option><option value="B">Si (B)</option></select></label>
+        <label><span>Estado</span><select id="statusSelect"><option>Por sacar</option><option selected>En aprendizaje</option><option>Casi lista</option><option>Dominada</option></select></label>
+        <button id="saveBtn" class="primary">Guardar</button>
+      </div>
+    </header>
+
+    <section class="grid-main">
+      <article class="panel chord-picker">
+        <div class="panel-head"><div><span class="step">1</span><h2>Acordes disponibles</h2></div><p>Elige la nota raíz y luego la variante.</p></div>
+        <div class="subhead">Nota raíz</div><div id="rootButtons" class="button-grid roots"></div>
+        <div class="subhead row-between"><span>Familia del acorde</span><span id="familyTitle" class="soft-badge">G</span></div>
+        <div id="qualityButtons" class="button-grid qualities"></div>
+      </article>
+
+      <article class="panel progression">
+        <div class="panel-head"><div><span class="step">2</span><h2>Secuencia / Progresión</h2></div><div class="inline-actions"><button id="undoChordBtn" class="ghost">Deshacer</button><button id="clearChordBtn" class="ghost danger">Limpiar</button></div></div>
+        <div class="section-tabs" id="sectionTabs"><button class="active" data-section="intro">Intro</button><button data-section="verso">Verso</button><button data-section="coro">Coro</button><button data-section="puente">Puente</button></div>
+        <div id="sequence" class="sequence"></div>
+        <label class="notes-field"><span>Observaciones de esta sección</span><textarea id="sectionNotes" placeholder="Ej.: cambio rápido de D a G al entrar al coro..."></textarea></label>
+      </article>
+
+      <article class="panel strum-panel">
+        <div class="panel-head"><div><span class="step">3</span><h2>Rasgueo</h2></div></div>
+        <div class="strum-options" id="strumOptions"><button data-pattern="↓ ↓↑ ↑↓↑" class="active">↓ ↓↑ ↑↓↑</button><button data-pattern="↓ ↑ ↓ ↑">↓ ↑ ↓ ↑</button><button data-pattern="↓ ↓ ↓↑">↓ ↓ ↓↑</button><button data-pattern="↓↑ ↓↑ ↓↑">↓↑ ↓↑ ↓↑</button></div>
+        <label class="notes-field"><span>Descripción</span><textarea id="strumNotes" placeholder="Patrón principal, acentos, cambios..."></textarea></label>
+      </article>
+
+      <article class="panel fretboard-panel">
+        <div class="panel-head"><div><span class="step">4</span><h2>Digitación del acorde</h2></div><div class="selected-chord"><strong id="selectedChordLabel">G</strong><span id="selectedChordName">Sol mayor</span></div></div>
+        <div class="fretboard-layout">
+          <div class="chord-info">
+            <div class="mini-card"><span>Notas del acorde</span><strong id="chordTones">G · B · D</strong></div>
+            <div class="mini-card"><span>Afinación base</span><strong>G · C · E · A · E</strong><small>Editable luego</small></div>
+            <button id="playChordBtn" class="primary wide">▶ Escuchar acorde</button>
+            <div class="legend"><div><span class="finger">1</span> Índice</div><div><span class="finger">2</span> Medio</div><div><span class="finger">3</span> Anular</div><div><span class="finger">4</span> Meñique</div></div>
+          </div>
+          <div class="fretboard-wrap"><div class="fret-numbers"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div id="fretboard" class="fretboard" aria-label="Diagrama de digitación del charango"></div><p class="hint">Los puntos morados muestran dónde colocar los dedos.</p></div>
+        </div>
+      </article>
+
+      <article class="panel used-panel"><div class="panel-head"><div><span class="step">5</span><h2>Acordes usados</h2></div></div><div id="usedChords" class="used-chords"></div></article>
+      <article class="panel tips-panel"><div class="panel-head"><div><span class="step">6</span><h2>Modo sacar de oído</h2></div></div><p>Prueba variantes de la misma raíz, escucha y elige la que mejor coincide con la canción.</p><div class="ear-mode"><button id="prevChordBtn" class="ghost">← Anterior</button><button id="earPlayBtn" class="primary">▶ Probar</button><button id="nextChordBtn" class="ghost">Siguiente →</button></div></article>
+    </section>
+
+    <footer class="statusbar"><span id="saveStatus">Cambios sin guardar</span><span>Primera versión funcional · Charango</span></footer>
+  </main>
+  <script src="charango.js"></script>
+</body>
+</html>
