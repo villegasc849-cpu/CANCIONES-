@@ -416,3 +416,35 @@ select:focus,input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
   .z-part-label{border-bottom:1px solid var(--line)}
   .z-part-editor-toolbar{grid-template-columns:1fr}
 }
+
+
+/* =========================================================
+   ZAMPOÑA V4 · MEDIOS TIEMPOS, FRASES Y FLECHAS SELECTIVAS
+   ========================================================= */
+.z-half-time-hat{
+  stroke:#4f326f;
+  stroke-width:2.3;
+  fill:none;
+  stroke-linecap:round;
+}
+.z-phrase-divider{
+  stroke:#c9bdd5;
+  stroke-width:1.4;
+  stroke-dasharray:4 7;
+  opacity:.55;
+}
+.z-space-hint{
+  margin:8px 0 0;
+  color:var(--muted);
+  font:11px Arial,sans-serif;
+}
+.z-space-hint b{color:var(--purple-dark)}
+#newPhraseBtn{
+  border-color:#d7c5e7;
+  background:#faf6ff;
+  color:var(--purple-dark);
+}
+#newPhraseBtn:hover{
+  border-color:var(--purple);
+  background:var(--purple-soft);
+}

@@ -156,6 +156,8 @@ function legacyToStructure(secciones) {
 function normalizeEvent(ev) {
   if (!ev) return null;
 
+  if (ev.tipo === "separador") return {tipo:"separador"};
+
   if (ev.tipo === "arrastre" && ev.desde && ev.hasta) {
     return {
       tipo:"arrastre",
@@ -209,104 +211,161 @@ function getStructure(record) {
   return legacyToStructure(raw);
 }
 
+
 function eventPoints(events) {
   const pts = [];
-  events.forEach(ev => {
-    if (ev.tipo === "arrastre") {
-      pts.push({kind:"drag-start", fila:ev.desde.fila, tubo:ev.desde.tubo, ev});
-      pts.push({kind:"drag-end", fila:ev.hasta.fila, tubo:ev.hasta.tubo, ev});
-    } else {
-      pts.push({kind:"note", fila:ev.fila, tubo:ev.tubo, ev});
+  events.forEach((ev,eventIndex) => {
+    if (!ev) return;
+    if (ev.tipo === "separador") {
+      pts.push({kind:"separator",eventIndex,ev});
+      return;
     }
+    if (ev.tipo === "arrastre") {
+      pts.push({kind:"drag-start",fila:ev.desde.fila,tubo:ev.desde.tubo,ev,eventIndex,halfGroup:null});
+      pts.push({kind:"drag-end",fila:ev.hasta.fila,tubo:ev.hasta.tubo,ev,eventIndex,halfGroup:null});
+      return;
+    }
+    pts.push({kind:"note",fila:ev.fila,tubo:ev.tubo,ev,eventIndex,halfGroup:null});
   });
+
+  let halfCounter = 0;
+  for (let i=0;i<pts.length-1;i++) {
+    const a=pts[i], b=pts[i+1];
+    if (
+      a.kind==="note" &&
+      b.kind==="note" &&
+      Number(a.ev?.duracion)===0.5 &&
+      Number(b.ev?.duracion)===0.5
+    ) {
+      const id=`half-${halfCounter++}`;
+      a.halfGroup=id; b.halfGroup=id; i++;
+    }
+  }
   return pts;
 }
 
-function renderNotation(events, interactive=false, onClick=null) {
+function renderNotation(events) {
   const points = eventPoints(events);
-  const unit = 86;
-  const pad = 34;
-  const width = Math.max(520, pad*2 + points.length * unit);
-  const height = 150;
-  const yTop = 42;
-  const yBottom = 112;
+  const unit = 82, separatorGap = 72, pad = 38;
+  const yTop = 42, yBottom = 112, height = 165;
 
+  let cursor = pad;
+  const positioned = [];
+  points.forEach(p => {
+    if (p.kind === "separator") {
+      cursor += separatorGap;
+      positioned.push({...p,x:cursor});
+      cursor += separatorGap * .35;
+    } else {
+      positioned.push({...p,x:cursor});
+      cursor += unit;
+    }
+  });
+
+  const width = Math.max(520, cursor + pad);
   const wrap = document.createElement("div");
   wrap.className = "z-notation-scroll";
 
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS,"svg");
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS,"svg");
   svg.setAttribute("class","z-notation");
   svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
   svg.setAttribute("width",width);
   svg.setAttribute("height",height);
 
-  const defs = document.createElementNS(svgNS,"defs");
+  const defs = document.createElementNS(NS,"defs");
   defs.innerHTML = `
-    <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+    <marker id="zArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
       <path d="M0,0 L8,4 L0,8 Z" fill="#382052"></path>
-    </marker>
-  `;
+    </marker>`;
   svg.append(defs);
 
-  function pointXY(index,p) {
-    return {x:pad + index*unit + unit/2, y:p.fila===ROW_TOP ? yTop : yBottom};
+  const yFor = p => p.fila===ROW_TOP ? yTop : yBottom;
+
+  function prevRealIndex(index) {
+    for (let i=index-1;i>=0;i--) {
+      if (positioned[i].kind === "separator") return -1;
+      return i;
+    }
+    return -1;
   }
 
-  // connectors between consecutive visible points
-  for (let i=0;i<points.length-1;i++) {
-    const a=points[i], b=points[i+1];
-    // Internal connection of an arrastre gets curved line, no arrow.
-    const sameDrag = a.ev === b.ev && a.ev?.tipo === "arrastre";
-    const A=pointXY(i,a), B=pointXY(i+1,b);
+  // Flecha SOLO cuando cambia de fila.
+  for (let i=1;i<positioned.length;i++) {
+    const b=positioned[i];
+    if (b.kind==="separator") continue;
+    const ai=prevRealIndex(i);
+    if (ai<0) continue;
+    const a=positioned[ai];
 
+    const sameDrag = a.ev===b.ev && a.ev?.tipo==="arrastre";
     if (sameDrag) {
-      const path=document.createElementNS(svgNS,"path");
-      const midX=(A.x+B.x)/2;
-      const curveY=Math.max(A.y,B.y)+28;
-      path.setAttribute("d",`M ${A.x+12} ${A.y+8} Q ${midX} ${curveY} ${B.x-12} ${B.y+8}`);
+      const path=document.createElementNS(NS,"path");
+      const Ay=yFor(a), By=yFor(b), mid=(a.x+b.x)/2;
+      const curveY=Math.max(Ay,By)+28;
+      path.setAttribute("d",`M ${a.x+12} ${Ay+8} Q ${mid} ${curveY} ${b.x-12} ${By+8}`);
       path.setAttribute("class","z-drag-path");
       svg.append(path);
-    } else {
-      const line=document.createElementNS(svgNS,"line");
-      line.setAttribute("x1",A.x+12);
-      line.setAttribute("y1",A.y);
-      line.setAttribute("x2",B.x-15);
-      line.setAttribute("y2",B.y);
+    } else if (a.fila !== b.fila) {
+      const line=document.createElementNS(NS,"line");
+      line.setAttribute("x1",a.x+12); line.setAttribute("y1",yFor(a));
+      line.setAttribute("x2",b.x-15); line.setAttribute("y2",yFor(b));
       line.setAttribute("class","z-transition-line");
-      line.setAttribute("marker-end","url(#arrowHead)");
+      line.setAttribute("marker-end","url(#zArrow)");
       svg.append(line);
     }
   }
 
-  points.forEach((p,index)=>{
-    const {x,y}=pointXY(index,p);
-    const text=document.createElementNS(svgNS,"text");
-    text.setAttribute("x",x);
-    text.setAttribute("y",y+6);
-    text.setAttribute("text-anchor","middle");
-    text.setAttribute("class","z-notation-number");
-    text.textContent=p.tubo;
-    if (interactive && onClick) {
-      text.style.cursor="pointer";
-      text.addEventListener("click",()=>onClick(index,p));
-    }
-    svg.append(text);
+  // Sombrerito para pares consecutivos de medio tiempo.
+  const groups = new Map();
+  positioned.forEach(p=>{
+    if(!p.halfGroup) return;
+    if(!groups.has(p.halfGroup)) groups.set(p.halfGroup,[]);
+    groups.get(p.halfGroup).push(p);
+  });
 
-    if (Number(p.ev?.duracion)!==1 && p.kind!=="drag-end") {
-      const dur=document.createElementNS(svgNS,"text");
-      dur.setAttribute("x",x);
-      dur.setAttribute("y",y-18);
-      dur.setAttribute("text-anchor","middle");
-      dur.setAttribute("class","z-duration-label");
-      dur.textContent=`×${p.ev.duracion}`;
-      svg.append(dur);
+  groups.forEach(group=>{
+    if(group.length!==2) return;
+    const [a,b]=group;
+    const topY=Math.min(yFor(a),yFor(b))-24;
+    const path=document.createElementNS(NS,"path");
+    const mid=(a.x+b.x)/2;
+    path.setAttribute("d",`M ${a.x-10} ${topY+8} Q ${mid} ${topY-9} ${b.x+10} ${topY+8}`);
+    path.setAttribute("class","z-half-time-hat");
+    svg.append(path);
+  });
+
+  positioned.forEach(p=>{
+    if(p.kind==="separator") {
+      const marker=document.createElementNS(NS,"line");
+      marker.setAttribute("x1",p.x); marker.setAttribute("x2",p.x);
+      marker.setAttribute("y1",25); marker.setAttribute("y2",135);
+      marker.setAttribute("class","z-phrase-divider");
+      svg.append(marker);
+      return;
+    }
+    const y=yFor(p);
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("x",p.x); t.setAttribute("y",y+6);
+    t.setAttribute("text-anchor","middle");
+    t.setAttribute("class","z-notation-number");
+    t.textContent=p.tubo;
+    svg.append(t);
+
+    if(Number(p.ev?.duracion)!==1 && Number(p.ev?.duracion)!==0.5 && p.kind!=="drag-end") {
+      const d=document.createElementNS(NS,"text");
+      d.setAttribute("x",p.x); d.setAttribute("y",y-18);
+      d.setAttribute("text-anchor","middle");
+      d.setAttribute("class","z-duration-label");
+      d.textContent=`×${p.ev.duracion}`;
+      svg.append(d);
     }
   });
 
   wrap.append(svg);
   return wrap;
 }
+
 
 function renderStructure(record) {
   const host=$("#publicStructure");
@@ -346,6 +405,10 @@ function renderStructure(record) {
 }
 
 async function playEvent(ev) {
+  if (ev.tipo === "separador") {
+    await new Promise(r=>setTimeout(r,650));
+    return;
+  }
   if (ev.tipo === "arrastre") {
     const first=findTube(ev.desde.fila,ev.desde.tubo);
     const second=findTube(ev.hasta.fila,ev.hasta.tubo);

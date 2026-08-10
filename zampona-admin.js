@@ -63,6 +63,7 @@ function activePart() {
 
 function normalizeEvent(ev) {
   if(!ev) return null;
+  if(ev.tipo==="separador") return {tipo:"separador"};
   if(ev.tipo==="arrastre" && ev.desde && ev.hasta) {
     return {
       tipo:"arrastre",
@@ -367,65 +368,161 @@ $("#addDividerBtn").addEventListener("click",()=>{
   structure.push(item);activeItemId=item.id;renderStructureList();renderActiveEditor();
 });
 
+
 function eventPoints(events) {
-  const pts=[];
-  events.forEach(ev=>{
-    if(ev.tipo==="arrastre") {
-      pts.push({kind:"drag-start",fila:ev.desde.fila,tubo:ev.desde.tubo,ev});
-      pts.push({kind:"drag-end",fila:ev.hasta.fila,tubo:ev.hasta.tubo,ev});
-    } else {
-      pts.push({kind:"note",fila:ev.fila,tubo:ev.tubo,ev});
+  const pts = [];
+  events.forEach((ev,eventIndex) => {
+    if (!ev) return;
+    if (ev.tipo === "separador") {
+      pts.push({kind:"separator",eventIndex,ev});
+      return;
     }
+    if (ev.tipo === "arrastre") {
+      pts.push({kind:"drag-start",fila:ev.desde.fila,tubo:ev.desde.tubo,ev,eventIndex,halfGroup:null});
+      pts.push({kind:"drag-end",fila:ev.hasta.fila,tubo:ev.hasta.tubo,ev,eventIndex,halfGroup:null});
+      return;
+    }
+    pts.push({kind:"note",fila:ev.fila,tubo:ev.tubo,ev,eventIndex,halfGroup:null});
   });
+
+  let halfCounter = 0;
+  for (let i=0;i<pts.length-1;i++) {
+    const a=pts[i], b=pts[i+1];
+    if (
+      a.kind==="note" &&
+      b.kind==="note" &&
+      Number(a.ev?.duracion)===0.5 &&
+      Number(b.ev?.duracion)===0.5
+    ) {
+      const id=`half-${halfCounter++}`;
+      a.halfGroup=id; b.halfGroup=id; i++;
+    }
+  }
   return pts;
 }
 
 function renderNotation(events) {
-  const points=eventPoints(events);
-  const unit=86,pad=34,width=Math.max(520,pad*2+points.length*unit),height=150,yTop=42,yBottom=112;
-  const wrap=document.createElement("div");wrap.className="z-notation-scroll";
-  const NS="http://www.w3.org/2000/svg";
-  const svg=document.createElementNS(NS,"svg");
+  const points = eventPoints(events);
+  const unit = 82, separatorGap = 72, pad = 38;
+  const yTop = 42, yBottom = 112, height = 165;
+
+  let cursor = pad;
+  const positioned = [];
+  points.forEach(p => {
+    if (p.kind === "separator") {
+      cursor += separatorGap;
+      positioned.push({...p,x:cursor});
+      cursor += separatorGap * .35;
+    } else {
+      positioned.push({...p,x:cursor});
+      cursor += unit;
+    }
+  });
+
+  const width = Math.max(520, cursor + pad);
+  const wrap = document.createElement("div");
+  wrap.className = "z-notation-scroll";
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS,"svg");
   svg.setAttribute("class","z-notation");
   svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
-  svg.setAttribute("width",width);svg.setAttribute("height",height);
+  svg.setAttribute("width",width);
+  svg.setAttribute("height",height);
 
-  const defs=document.createElementNS(NS,"defs");
-  defs.innerHTML=`<marker id="adminArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#382052"></path></marker>`;
+  const defs = document.createElementNS(NS,"defs");
+  defs.innerHTML = `
+    <marker id="zArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#382052"></path>
+    </marker>`;
   svg.append(defs);
 
-  const xy=(i,p)=>({x:pad+i*unit+unit/2,y:p.fila===ROW_TOP?yTop:yBottom});
+  const yFor = p => p.fila===ROW_TOP ? yTop : yBottom;
 
-  for(let i=0;i<points.length-1;i++) {
-    const a=points[i],b=points[i+1],A=xy(i,a),B=xy(i+1,b);
-    const sameDrag=a.ev===b.ev && a.ev?.tipo==="arrastre";
+  function prevRealIndex(index) {
+    for (let i=index-1;i>=0;i--) {
+      if (positioned[i].kind === "separator") return -1;
+      return i;
+    }
+    return -1;
+  }
 
-    if(sameDrag) {
+  // Flecha SOLO cuando cambia de fila.
+  for (let i=1;i<positioned.length;i++) {
+    const b=positioned[i];
+    if (b.kind==="separator") continue;
+    const ai=prevRealIndex(i);
+    if (ai<0) continue;
+    const a=positioned[ai];
+
+    const sameDrag = a.ev===b.ev && a.ev?.tipo==="arrastre";
+    if (sameDrag) {
       const path=document.createElementNS(NS,"path");
-      const mid=(A.x+B.x)/2,cy=Math.max(A.y,B.y)+28;
-      path.setAttribute("d",`M ${A.x+12} ${A.y+8} Q ${mid} ${cy} ${B.x-12} ${B.y+8}`);
+      const Ay=yFor(a), By=yFor(b), mid=(a.x+b.x)/2;
+      const curveY=Math.max(Ay,By)+28;
+      path.setAttribute("d",`M ${a.x+12} ${Ay+8} Q ${mid} ${curveY} ${b.x-12} ${By+8}`);
       path.setAttribute("class","z-drag-path");
       svg.append(path);
-    } else {
+    } else if (a.fila !== b.fila) {
       const line=document.createElementNS(NS,"line");
-      line.setAttribute("x1",A.x+12);line.setAttribute("y1",A.y);
-      line.setAttribute("x2",B.x-15);line.setAttribute("y2",B.y);
-      line.setAttribute("class","z-transition-line");line.setAttribute("marker-end","url(#adminArrow)");
+      line.setAttribute("x1",a.x+12); line.setAttribute("y1",yFor(a));
+      line.setAttribute("x2",b.x-15); line.setAttribute("y2",yFor(b));
+      line.setAttribute("class","z-transition-line");
+      line.setAttribute("marker-end","url(#zArrow)");
       svg.append(line);
     }
   }
 
-  points.forEach((p,i)=>{
-    const {x,y}=xy(i,p);
-    const text=document.createElementNS(NS,"text");
-    text.setAttribute("x",x);text.setAttribute("y",y+6);text.setAttribute("text-anchor","middle");
-    text.setAttribute("class","z-notation-number");text.textContent=p.tubo;
-    svg.append(text);
+  // Sombrerito para pares consecutivos de medio tiempo.
+  const groups = new Map();
+  positioned.forEach(p=>{
+    if(!p.halfGroup) return;
+    if(!groups.has(p.halfGroup)) groups.set(p.halfGroup,[]);
+    groups.get(p.halfGroup).push(p);
+  });
+
+  groups.forEach(group=>{
+    if(group.length!==2) return;
+    const [a,b]=group;
+    const topY=Math.min(yFor(a),yFor(b))-24;
+    const path=document.createElementNS(NS,"path");
+    const mid=(a.x+b.x)/2;
+    path.setAttribute("d",`M ${a.x-10} ${topY+8} Q ${mid} ${topY-9} ${b.x+10} ${topY+8}`);
+    path.setAttribute("class","z-half-time-hat");
+    svg.append(path);
+  });
+
+  positioned.forEach(p=>{
+    if(p.kind==="separator") {
+      const marker=document.createElementNS(NS,"line");
+      marker.setAttribute("x1",p.x); marker.setAttribute("x2",p.x);
+      marker.setAttribute("y1",25); marker.setAttribute("y2",135);
+      marker.setAttribute("class","z-phrase-divider");
+      svg.append(marker);
+      return;
+    }
+    const y=yFor(p);
+    const t=document.createElementNS(NS,"text");
+    t.setAttribute("x",p.x); t.setAttribute("y",y+6);
+    t.setAttribute("text-anchor","middle");
+    t.setAttribute("class","z-notation-number");
+    t.textContent=p.tubo;
+    svg.append(t);
+
+    if(Number(p.ev?.duracion)!==1 && Number(p.ev?.duracion)!==0.5 && p.kind!=="drag-end") {
+      const d=document.createElementNS(NS,"text");
+      d.setAttribute("x",p.x); d.setAttribute("y",y-18);
+      d.setAttribute("text-anchor","middle");
+      d.setAttribute("class","z-duration-label");
+      d.textContent=`×${p.ev.duracion}`;
+      svg.append(d);
+    }
   });
 
   wrap.append(svg);
   return wrap;
 }
+
 
 function renderActiveEditor() {
   const item=activeItem();
@@ -456,8 +553,12 @@ function renderActiveEditor() {
   host.append(renderNotation(item.eventos));
 
   $("#manualSequence").value=item.eventos
-    .filter(e=>e.tipo==="nota")
-    .map(e=>`${e.fila===ROW_TOP?"S":"I"}${e.tubo}`)
+    .map(e=>{
+      if(e.tipo==="separador") return "/";
+      if(e.tipo==="nota") return `${e.fila===ROW_TOP?"S":"I"}${e.tubo}`;
+      return "";
+    })
+    .filter(Boolean)
     .join(" ");
 }
 
@@ -508,6 +609,29 @@ function registerTubeClick(tube) {
   renderStructureList();
 }
 
+
+function insertPhraseSeparator() {
+  const p=activePart();
+  if(!p || !p.eventos.length) return;
+  if(p.eventos[p.eventos.length-1]?.tipo==="separador") return;
+  p.eventos.push({tipo:"separador"});
+  pendingDragStart=null;
+  renderActiveEditor();
+  renderStructureList();
+}
+
+$("#newPhraseBtn").addEventListener("click",insertPhraseSeparator);
+
+document.addEventListener("keydown",(e)=>{
+  if(e.code!=="Space" || $("#partEditor").hidden) return;
+  const target=e.target;
+  const tag=target?.tagName?.toLowerCase();
+  const typing=tag==="input" || tag==="textarea" || tag==="select" || target?.isContentEditable;
+  if(typing) return;
+  e.preventDefault();
+  insertPhraseSeparator();
+});
+
 $("#undoEventBtn").addEventListener("click",()=>{
   const p=activePart();if(!p)return;
   p.eventos.pop();pendingDragStart=null;renderActiveEditor();renderStructureList();
@@ -519,6 +643,10 @@ $("#clearEventsBtn").addEventListener("click",()=>{
 });
 
 async function playEvent(ev) {
+  if(ev.tipo==="separador") {
+    await new Promise(r=>setTimeout(r,650));
+    return;
+  }
   if(ev.tipo==="arrastre") {
     const a=getTube(ev.desde.fila,ev.desde.tubo),b=getTube(ev.hasta.fila,ev.hasta.tubo);
     if(a) playTube(a);
@@ -544,6 +672,10 @@ $("#applyManualBtn").addEventListener("click",()=>{
   const parsed=[];
 
   for(const token of tokens) {
+    if(token==="/" || token==="|") {
+      if(parsed.length && parsed[parsed.length-1]?.tipo!=="separador") parsed.push({tipo:"separador"});
+      continue;
+    }
     const m=token.match(/^([SI])(\d{1,2})$/i);
     if(!m) continue;
     const fila=m[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
@@ -551,6 +683,7 @@ $("#applyManualBtn").addEventListener("click",()=>{
     const n=Number(m[2]);
     if(n>=1 && n<=max) parsed.push({tipo:"nota",fila,tubo:n,duracion:dur});
   }
+  if(parsed[parsed.length-1]?.tipo==="separador") parsed.pop();
 
   p.eventos=parsed;
   renderActiveEditor();renderStructureList();
