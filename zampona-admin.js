@@ -2,31 +2,139 @@ const $ = (q) => document.querySelector(q);
 
 let songs = [];
 let tubes = [];
-let tubeRecording = false;
+let structure = [];
+let activeItemId = null;
+let recordMode = "nota";
+let pendingDragStart = null;
 
-function setStatus(el,text,type=""){
-  el.textContent = text;
-  el.className = `status-message${type ? ` is-${type}` : ""}`;
-}
-function parseSequence(value){
-  const raw=String(value || "").trim();
-  if(!raw) return [];
-  if(raw.startsWith("#")) return [raw];
-  return raw.split(/[\s,;|]+/).map(x=>x.trim()).filter(Boolean);
-}
-function joinSequence(arr){ return Array.isArray(arr) ? arr.join(" ") : ""; }
+const ROW_TOP = "superior";
+const ROW_BOTTOM = "inferior";
+const SEMITONES = {C:0,"C#":1,D:2,"D#":3,E:4,F:5,"F#":6,G:7,"G#":8,A:9,"A#":10,B:11};
 
-async function ensureAdmin(){
-  if(!window.CancioneroDB?.configured){
-    $("#loginView").hidden=false;
-    $("#adminView").hidden=true;
+function uid() {
+  return (crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+}
+
+function setStatus(el,text,type="") {
+  el.textContent=text;
+  el.className=`status-message${type?` is-${type}`:""}`;
+}
+
+function tubeHeight(position,row) {
+  const max=row===ROW_TOP?12:11;
+  const minH=82,maxH=205;
+  const ratio=(Number(position)-1)/(max-1);
+  return Math.round(minH+ratio*(maxH-minH));
+}
+
+function tubeCode(t) {
+  return Number(t?.posicion || t?.numero || 0);
+}
+
+function spanishNote(note) {
+  const map={C:"Do","C#":"Do#",D:"Re","D#":"Re#",E:"Mi",F:"Fa","F#":"Fa#",G:"Sol","G#":"Sol#",A:"La","A#":"La#",B:"Si"};
+  const m=String(note||"").match(/^([A-G](?:#)?)(\d+)?$/);
+  return m ? (map[m[1]]||m[1]) : "—";
+}
+
+function frequencyFor(pitch,octave) {
+  if(!(pitch in SEMITONES)) return null;
+  const midi=(Number(octave)+1)*12+SEMITONES[pitch];
+  return 440*Math.pow(2,(midi-69)/12);
+}
+
+function parseStoredNote(note) {
+  const m=String(note||"").match(/^([A-G](?:#)?)(\d+)$/);
+  return m ? {pitch:m[1],octave:Number(m[2])} : {pitch:"",octave:4};
+}
+
+function getTube(row,pos) {
+  return tubes.find(t=>t.fila===row && Number(t.posicion)===Number(pos));
+}
+
+function activeItem() {
+  return structure.find(x=>x.id===activeItemId) || null;
+}
+
+function activePart() {
+  const x=activeItem();
+  return x?.tipo==="parte" ? x : null;
+}
+
+function normalizeEvent(ev) {
+  if(!ev) return null;
+  if(ev.tipo==="arrastre" && ev.desde && ev.hasta) {
+    return {
+      tipo:"arrastre",
+      desde:{fila:ev.desde.fila,tubo:Number(ev.desde.tubo)},
+      hasta:{fila:ev.hasta.fila,tubo:Number(ev.hasta.tubo)},
+      duracion:Number(ev.duracion)||1
+    };
+  }
+  if(ev.tipo==="nota" || ev.tubo!=null) {
+    return {
+      tipo:"nota",
+      fila:ev.fila || ROW_TOP,
+      tubo:Number(ev.tubo),
+      duracion:Number(ev.duracion)||1
+    };
+  }
+  return null;
+}
+
+function legacyToStructure(secciones) {
+  const labels={intro:"Intro",verso:"Verso",coro:"Coro",puente:"Puente",final:"Final"};
+  const result=[];
+  Object.entries(labels).forEach(([key,label])=>{
+    const raw=secciones?.[key];
+    if(!raw) return;
+
+    if(typeof raw==="object" && !Array.isArray(raw) && Array.isArray(raw.eventos)) {
+      result.push({
+        id:uid(),tipo:"parte",nombre:label,
+        comentario:String(raw.comentario||""),
+        eventos:raw.eventos.map(normalizeEvent).filter(Boolean)
+      });
+      return;
+    }
+
+    if(Array.isArray(raw) && raw.length) {
+      result.push({
+        id:uid(),tipo:"parte",nombre:label,comentario:"",
+        eventos:raw.map(v=>({tipo:"nota",fila:ROW_TOP,tubo:Number(v),duracion:1})).filter(x=>Number.isFinite(x.tubo))
+      });
+    }
+  });
+  return result;
+}
+
+function hydrateStructure(record) {
+  const sec=record?.secciones||{};
+  if(Array.isArray(sec.estructura)) {
+    return sec.estructura.map(item=>{
+      if(item.tipo==="divisor") {
+        return {id:item.id||uid(),tipo:"divisor",texto:String(item.texto||"")};
+      }
+      return {
+        id:item.id||uid(),tipo:"parte",
+        nombre:String(item.nombre||"Parte"),
+        comentario:String(item.comentario||""),
+        eventos:(item.eventos||[]).map(normalizeEvent).filter(Boolean)
+      };
+    });
+  }
+  return legacyToStructure(sec);
+}
+
+async function ensureAdmin() {
+  if(!window.CancioneroDB?.configured) {
     setStatus($("#loginStatus"),"Configura Supabase antes de entrar.","error");
     return;
   }
   const session=await window.CancioneroDB.getSession();
   $("#loginView").hidden=Boolean(session);
   $("#adminView").hidden=!session;
-  if(session){
+  if(session) {
     $("#adminUser").textContent=session.user.email;
     await initAdmin();
   }
@@ -34,187 +142,78 @@ async function ensureAdmin(){
 
 $("#loginForm").addEventListener("submit",async e=>{
   e.preventDefault();
-  setStatus($("#loginStatus"),"Ingresando…");
-  try{
+  try {
     await window.CancioneroDB.signIn($("#loginEmail").value,$("#loginPassword").value);
     await ensureAdmin();
-  }catch(error){ setStatus($("#loginStatus"),error.message,"error"); }
+  } catch(err) {
+    setStatus($("#loginStatus"),err.message,"error");
+  }
 });
-$("#logoutBtn").addEventListener("click",async()=>{ await window.CancioneroDB.signOut(); location.reload(); });
 
-async function loadSongs(){
+$("#logoutBtn").addEventListener("click",async()=>{
+  await window.CancioneroDB.signOut();
+  location.reload();
+});
+
+async function loadSongs() {
   songs=await window.CancioneroDB.listSongs();
   const select=$("#songSelect");
   select.replaceChildren();
   songs.forEach(song=>{
-    const opt=document.createElement("option");
-    opt.value=song.id;
-    opt.textContent=`${song.numero ? song.numero+" · " : ""}${song.titulo}`;
-    select.append(opt);
+    const o=document.createElement("option");
+    o.value=song.id;
+    o.textContent=`${song.numero? song.numero+" · ":""}${song.titulo}`;
+    select.append(o);
   });
 }
 
-async function getSongRecord(songId){
-  const {data,error}=await window.CancioneroDB.client.from("zampona_canciones").select("*").eq("cancion_id",songId).maybeSingle();
+async function fetchTubes() {
+  const {data,error}=await window.CancioneroDB.client
+    .from("zampona_tubos").select("*").order("fila").order("posicion");
+  if(error) throw error;
+  tubes=data||[];
+}
+
+async function fetchRecord(songId) {
+  const {data,error}=await window.CancioneroDB.client
+    .from("zampona_canciones").select("*").eq("cancion_id",songId).maybeSingle();
   if(error) throw error;
   return data;
 }
 
-async function loadSongRecord(){
-  const songId=$("#songSelect").value;
-  if(!songId) return;
-  try{
-    const data=await getSongRecord(songId);
-    $("#songScale").value=data?.escala || "";
-    $("#songTempo").value=data?.tempo || "";
-    $("#songPublished").checked=Boolean(data?.publicado);
-    const s=data?.secciones || {};
-    $("#secIntro").value=joinSequence(s.intro);
-    $("#secVerso").value=joinSequence(s.verso);
-    $("#secCoro").value=joinSequence(s.coro);
-    $("#secPuente").value=joinSequence(s.puente);
-    $("#secFinal").value=joinSequence(s.final);
-    setStatus($("#songSaveStatus"),data ? "Ficha cargada." : "Esta canción todavía no tiene ficha.");
-  }catch(error){ setStatus($("#songSaveStatus"),error.message,"error"); }
-}
-$("#songSelect").addEventListener("change",loadSongRecord);
+function renderAdminTube(tube) {
+  const btn=document.createElement("button");
+  btn.type="button";
+  btn.className="z-pipe z-pipe-admin";
+  btn.style.height=`${tubeHeight(tube.posicion,tube.fila)}px`;
+  btn.dataset.id=tube.id;
+  btn.innerHTML=`
+    <span class="z-pipe-hole"></span>
+    <span class="z-pipe-number">${tubeCode(tube)}</span>
+    <span class="z-pipe-note">${spanishNote(tube.nota)}</span>
+    <small>${tube.nota||""}</small>
+  `;
 
-$("#saveSongRecord").addEventListener("click",async()=>{
-  const songId=$("#songSelect").value;
-  if(!songId) return;
-  const payload={
-    cancion_id:songId,
-    escala:$("#songScale").value.trim(),
-    tempo:$("#songTempo").value ? Number($("#songTempo").value) : null,
-    publicado:$("#songPublished").checked,
-    secciones:{
-      intro:parseSequence($("#secIntro").value),
-      verso:parseSequence($("#secVerso").value),
-      coro:parseSequence($("#secCoro").value),
-      puente:parseSequence($("#secPuente").value),
-      final:parseSequence($("#secFinal").value)
-    },
-    updated_at:new Date().toISOString()
-  };
-  setStatus($("#songSaveStatus"),"Guardando…");
-  const {error}=await window.CancioneroDB.client.from("zampona_canciones").upsert(payload,{onConflict:"cancion_id"});
-  if(error) setStatus($("#songSaveStatus"),error.message,"error");
-  else setStatus($("#songSaveStatus"),"Ficha guardada correctamente.","success");
-});
-
-function defaultTubeRows(){
-  const rows=[];
-  for(let i=1;i<=12;i++) rows.push({fila:"superior",posicion:i});
-  for(let i=1;i<=11;i++) rows.push({fila:"inferior",posicion:i});
-  return rows;
-}
-async function loadTubes(){
-  const {data,error}=await window.CancioneroDB.client.from("zampona_tubos").select("*").order("fila").order("posicion");
-  if(error) throw error;
-  tubes=data || [];
-  renderTubeList();
-  renderAdminMap();
-}
-function tubeHeight(position,row){
-  const max=row==="superior" ? 12 : 11;
-  const minH=85,maxH=220;
-  const ratio=(position-1)/(max-1);
-  return Math.round(maxH-ratio*(maxH-minH));
-}
-function getTubeAt(row,pos){ return tubes.find(t=>t.fila===row && Number(t.posicion)===Number(pos)); }
-
-function renderAdminMap(){
-  const upper=$("#adminUpperRow"),lower=$("#adminLowerRow");
-  upper.replaceChildren(); lower.replaceChildren();
-  defaultTubeRows().forEach(slot=>{
-    const existing=getTubeAt(slot.fila,slot.posicion);
-    const btn=document.createElement("button");
-    btn.type="button";
-    btn.className="zampona-admin-tube";
-    btn.style.height=`${tubeHeight(slot.posicion,slot.fila)}px`;
-    if(existing?.id===$("#tubeId").value) btn.classList.add("selected");
-    const span=document.createElement("span");
-    span.textContent=existing?.etiqueta || existing?.numero || slot.posicion;
-    btn.append(span);
-    btn.addEventListener("click",()=>{ if(tubeRecording && existing){ appendTubeToSection(existing); playFrequency(existing.frecuencia); flashAdminTube(btn); } else existing ? fillTube(existing) : fillEmptySlot(slot); });
-    (slot.fila==="superior" ? upper : lower).append(btn);
+  btn.addEventListener("click",()=>{
+    selectTube(tube);
+    registerTubeClick(tube);
   });
+  return btn;
 }
 
-function renderTubeList(){
-  const list=$("#tubeList");
-  list.replaceChildren();
-  defaultTubeRows().forEach(slot=>{
-    const existing=getTubeAt(slot.fila,slot.posicion);
-    const btn=document.createElement("button");
-    btn.type="button";
-    btn.className="zampona-tube-admin-item";
-    const title=existing ? `${slot.fila==="superior" ? "S" : "I"}${slot.posicion} · ${existing.etiqueta || existing.numero || "sin etiqueta"}` : `${slot.fila==="superior" ? "S" : "I"}${slot.posicion} · sin configurar`;
-    btn.innerHTML=`<strong>${title}</strong><span>${existing?.nota || "Sin nota"}${existing?.frecuencia ? " · "+Number(existing.frecuencia).toFixed(2)+" Hz" : ""}</span>`;
-    btn.addEventListener("click",()=>existing ? fillTube(existing) : fillEmptySlot(slot));
-    list.append(btn);
-  });
+function renderInstrument() {
+  const top=$("#adminUpperRow"),bottom=$("#adminLowerRow");
+  top.replaceChildren();bottom.replaceChildren();
+
+  tubes.filter(t=>t.fila===ROW_TOP).sort((a,b)=>a.posicion-b.posicion).forEach(t=>top.append(renderAdminTube(t)));
+  tubes.filter(t=>t.fila===ROW_BOTTOM).sort((a,b)=>a.posicion-b.posicion).forEach(t=>bottom.append(renderAdminTube(t)));
 }
 
-const SEMITONES={C:0,"C#":1,D:2,"D#":3,E:4,F:5,"F#":6,G:7,"G#":8,A:9,"A#":10,B:11};
-
-function frequencyFor(pitch,octave){
-  if(!(pitch in SEMITONES)) return null;
-  const midi=(Number(octave)+1)*12+SEMITONES[pitch];
-  return 440*Math.pow(2,(midi-69)/12);
-}
-
-function parseStoredNote(note){
-  const m=String(note || "").match(/^([A-G](?:#)?)(-?\d+)$/);
-  if(!m) return {pitch:"",octave:4};
-  return {pitch:m[1],octave:Number(m[2])};
-}
-
-function calculatedFrequency(){
-  const pitch=$("#tubePitch").value;
-  const octave=Number($("#tubeOctave").value);
-  return frequencyFor(pitch,octave);
-}
-
-function effectiveFrequency(){
-  if($("#useCustomFrequency").checked){
-    const custom=Number($("#customFrequency").value);
-    return custom>0 ? custom : null;
-  }
-  return calculatedFrequency();
-}
-
-function updateFrequencyUI(){
-  const auto=calculatedFrequency();
-  $("#autoFrequency").textContent=auto ? `${auto.toFixed(2)} Hz` : "— Hz";
-  $("#customFrequency").disabled=!$("#useCustomFrequency").checked;
-}
-$("#tubePitch").addEventListener("change",updateFrequencyUI);
-$("#tubeOctave").addEventListener("change",updateFrequencyUI);
-$("#useCustomFrequency").addEventListener("change",updateFrequencyUI);
-
-function fillEmptySlot(slot){
-  $("#tubeId").value="";
-  $("#tubeRow").value=slot.fila;
-  $("#tubePosition").value=slot.posicion;
-  $("#tubeNumber").value="";
-  $("#tubeLabel").value="";
-  $("#tubePitch").value="";
-  $("#tubeOctave").value="4";
-  $("#useCustomFrequency").checked=false;
-  $("#customFrequency").value="";
-  $("#tubePublished").checked=false;
-  updateFrequencyUI();
-  renderAdminMap();
-  setStatus($("#tubeSaveStatus"),"Tubo nuevo: define sus datos.");
-}
-
-function fillTube(tube){
+function selectTube(tube) {
+  document.querySelectorAll(".z-pipe-admin").forEach(x=>x.classList.toggle("is-selected",x.dataset.id===tube.id));
   $("#tubeId").value=tube.id;
-  $("#tubeRow").value=tube.fila;
-  $("#tubePosition").value=tube.posicion;
-  $("#tubeNumber").value=tube.numero || "";
-  $("#tubeLabel").value=tube.etiqueta || "";
+  $("#tubeRowDisplay").value=tube.fila===ROW_TOP?"Superior (12 tubos)":"Inferior (11 tubos)";
+  $("#tubeNumber").value=tubeCode(tube);
 
   const parsed=parseStoredNote(tube.nota);
   $("#tubePitch").value=parsed.pitch;
@@ -222,92 +221,391 @@ function fillTube(tube){
 
   const auto=frequencyFor(parsed.pitch,parsed.octave);
   const stored=Number(tube.frecuencia);
-  const custom=stored && auto && Math.abs(stored-auto)>.5;
-  $("#useCustomFrequency").checked=Boolean(custom);
-  $("#customFrequency").value=custom ? stored.toFixed(2) : "";
-
+  const custom=Boolean(stored && auto && Math.abs(stored-auto)>.5);
+  $("#useCustomFrequency").checked=custom;
+  $("#customFrequency").value=custom?stored.toFixed(2):"";
   $("#tubePublished").checked=Boolean(tube.publicado);
   updateFrequencyUI();
-  renderAdminMap();
 }
 
-function playFrequency(freq){
-  const value=Number(freq);
-  if(!value || value<=0){
-    setStatus($("#tubeSaveStatus"),"Selecciona una nota y octava válidas, o usa una frecuencia personalizada.","error");
-    return;
+function updateFrequencyUI() {
+  const auto=frequencyFor($("#tubePitch").value,$("#tubeOctave").value);
+  $("#autoFrequency").textContent=auto?`${auto.toFixed(2)} Hz`:"— Hz";
+  $("#customFrequency").disabled=!$("#useCustomFrequency").checked;
+}
+
+$("#tubePitch").addEventListener("change",updateFrequencyUI);
+$("#tubeOctave").addEventListener("change",updateFrequencyUI);
+$("#useCustomFrequency").addEventListener("change",updateFrequencyUI);
+
+function effectiveFrequency() {
+  if($("#useCustomFrequency").checked) {
+    const f=Number($("#customFrequency").value);
+    return f>0?f:null;
   }
-  const ctx=new (window.AudioContext || window.webkitAudioContext)();
-  const now=ctx.currentTime;
-  const osc=ctx.createOscillator(),gain=ctx.createGain(),filter=ctx.createBiquadFilter();
-  osc.type="sine"; osc.frequency.value=value;
-  filter.type="lowpass"; filter.frequency.value=1800;
-  gain.gain.setValueAtTime(.0001,now);
-  gain.gain.exponentialRampToValueAtTime(.13,now+.025);
-  gain.gain.exponentialRampToValueAtTime(.0001,now+.75);
-  osc.connect(filter).connect(gain).connect(ctx.destination);
-  osc.start(now); osc.stop(now+.8);
+  return frequencyFor($("#tubePitch").value,$("#tubeOctave").value);
 }
 
-$("#playTubeBtn").addEventListener("click",()=>playFrequency(effectiveFrequency()));
+function synth(freq,duration=.65) {
+  const f=Number(freq); if(!f) return;
+  const Ctx=window.AudioContext||window.webkitAudioContext;
+  const ctx=new Ctx(),now=ctx.currentTime;
+  const osc=ctx.createOscillator(),gain=ctx.createGain(),filter=ctx.createBiquadFilter();
+  osc.type="sine";osc.frequency.value=f;filter.type="lowpass";filter.frequency.value=1500;
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(.12,now+.02);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+duration);
+  osc.connect(filter).connect(gain).connect(ctx.destination);
+  osc.start(now);osc.stop(now+duration+.05);
+}
+
+function playTube(tube) {
+  synth(tube?.frecuencia || effectiveFrequency());
+}
+
+$("#playTubeBtn").addEventListener("click",()=>{
+  const tube=tubes.find(t=>t.id===$("#tubeId").value);
+  playTube(tube);
+});
 
 $("#saveTubeBtn").addEventListener("click",async()=>{
-  const row=$("#tubeRow").value;
-  const position=Number($("#tubePosition").value);
-  const max=row==="superior" ? 12 : 11;
-  if(!position || position<1 || position>max){
-    setStatus($("#tubeSaveStatus"),`La fila ${row} admite posiciones del 1 al ${max}.`,"error");
+  const id=$("#tubeId").value;
+  const tube=tubes.find(t=>t.id===id);
+  if(!tube) {
+    setStatus($("#tubeSaveStatus"),"Selecciona un tubo.","error");
     return;
   }
 
   const pitch=$("#tubePitch").value;
   const octave=Number($("#tubeOctave").value);
-  const freq=effectiveFrequency();
-
-  if(!pitch || !freq){
-    setStatus($("#tubeSaveStatus"),"Selecciona nota y octava antes de guardar.","error");
+  const frequency=effectiveFrequency();
+  if(!pitch || !frequency) {
+    setStatus($("#tubeSaveStatus"),"Selecciona nota y octava.","error");
     return;
   }
 
+  // numeración fija = posición. No puede cambiarse.
   const payload={
-    fila:row,
-    posicion:position,
-    numero:$("#tubeNumber").value.trim(),
-    etiqueta:$("#tubeLabel").value.trim(),
+    numero:String(tube.posicion),
+    etiqueta:String(tube.posicion),
     nota:`${pitch}${octave}`,
-    frecuencia:Number(freq.toFixed(4)),
+    frecuencia:Number(frequency.toFixed(4)),
     publicado:$("#tubePublished").checked,
     updated_at:new Date().toISOString()
   };
 
-  const id=$("#tubeId").value;
-  setStatus($("#tubeSaveStatus"),"Guardando…");
-  let query;
-  if(id) query=window.CancioneroDB.client.from("zampona_tubos").update(payload).eq("id",id);
-  else query=window.CancioneroDB.client.from("zampona_tubos").insert(payload);
+  const {error}=await window.CancioneroDB.client
+    .from("zampona_tubos").update(payload).eq("id",id);
 
-  const {error}=await query;
-  if(error){
+  if(error) {
     setStatus($("#tubeSaveStatus"),error.message,"error");
     return;
   }
 
-  setStatus($("#tubeSaveStatus"),"Tubo guardado correctamente.","success");
-  await loadTubes();
-  const saved=getTubeAt(row,position);
-  if(saved) fillTube(saved);
+  setStatus($("#tubeSaveStatus"),"Tubo actualizado correctamente.","success");
+  await fetchTubes();
+  renderInstrument();
+  const refreshed=tubes.find(t=>t.id===id);
+  if(refreshed) selectTube(refreshed);
 });
 
-function sectionInput(key){ return $("#sec"+key.charAt(0).toUpperCase()+key.slice(1)); }
-function appendTubeToSection(tube){ const input=sectionInput($("#recordSection").value); if(!input)return; const token=tube.etiqueta||tube.numero||tube.posicion; input.value=(input.value+" "+token).trim(); input.dispatchEvent(new Event("input")); }
-function flashAdminTube(el){ el.classList.add("is-playing"); setTimeout(()=>el.classList.remove("is-playing"),350); }
-$("#toggleTubeRecording")?.addEventListener("click",()=>{tubeRecording=!tubeRecording; const b=$("#toggleTubeRecording"); b.classList.toggle("active",tubeRecording); b.textContent=tubeRecording?"● Registrando: toca los tubos":"● Activar registro por tubos";});
-$("#undoTubeNote")?.addEventListener("click",()=>{const input=sectionInput($("#recordSection").value); if(!input)return; const a=parseSequence(input.value);a.pop();input.value=a.join(" ");});
+function renderStructureList() {
+  const host=$("#structureList");
+  host.replaceChildren();
 
-async function initAdmin(){
-  await loadSongs();
-  await loadTubes();
-  await loadSongRecord();
-  if(!$("#tubeId").value) fillEmptySlot({fila:"superior",posicion:1});
+  structure.forEach((item,index)=>{
+    const row=document.createElement("button");
+    row.type="button";
+    row.className=`z-structure-item${item.id===activeItemId?" active":""}${item.tipo==="divisor"?" is-divider":""}`;
+
+    if(item.tipo==="divisor") {
+      row.innerHTML=`<strong>— ${item.texto || "Comentario / divisor"} —</strong>`;
+    } else {
+      row.innerHTML=`<strong>${item.nombre}</strong><span>${item.eventos.length} evento(s)${item.comentario? " · comentario":""}</span>`;
+    }
+
+    row.addEventListener("click",()=>{
+      activeItemId=item.id;
+      pendingDragStart=null;
+      renderStructureList();
+      renderActiveEditor();
+    });
+
+    const controls=document.createElement("span");
+    controls.className="z-item-controls";
+
+    const up=document.createElement("button");
+    up.type="button";up.textContent="↑";up.title="Subir";
+    up.addEventListener("click",e=>{e.stopPropagation();if(index>0){[structure[index-1],structure[index]]=[structure[index],structure[index-1]];renderStructureList();}});
+
+    const down=document.createElement("button");
+    down.type="button";down.textContent="↓";down.title="Bajar";
+    down.addEventListener("click",e=>{e.stopPropagation();if(index<structure.length-1){[structure[index+1],structure[index]]=[structure[index],structure[index+1]];renderStructureList();}});
+
+    const del=document.createElement("button");
+    del.type="button";del.textContent="×";del.title="Eliminar";
+    del.addEventListener("click",e=>{
+      e.stopPropagation();
+      structure.splice(index,1);
+      if(activeItemId===item.id) activeItemId=structure[0]?.id||null;
+      renderStructureList();renderActiveEditor();
+    });
+
+    controls.append(up,down,del);
+    row.append(controls);
+    host.append(row);
+  });
 }
-ensureAdmin().catch(error=>setStatus($("#loginStatus"),error.message,"error"));
+
+$("#addPartBtn").addEventListener("click",()=>{
+  const item={id:uid(),tipo:"parte",nombre:`${structure.filter(x=>x.tipo==="parte").length+1}ra. Parte`,comentario:"",eventos:[]};
+  structure.push(item);activeItemId=item.id;renderStructureList();renderActiveEditor();
+});
+
+$("#addDividerBtn").addEventListener("click",()=>{
+  const item={id:uid(),tipo:"divisor",texto:"Cambio a menores"};
+  structure.push(item);activeItemId=item.id;renderStructureList();renderActiveEditor();
+});
+
+function eventPoints(events) {
+  const pts=[];
+  events.forEach(ev=>{
+    if(ev.tipo==="arrastre") {
+      pts.push({kind:"drag-start",fila:ev.desde.fila,tubo:ev.desde.tubo,ev});
+      pts.push({kind:"drag-end",fila:ev.hasta.fila,tubo:ev.hasta.tubo,ev});
+    } else {
+      pts.push({kind:"note",fila:ev.fila,tubo:ev.tubo,ev});
+    }
+  });
+  return pts;
+}
+
+function renderNotation(events) {
+  const points=eventPoints(events);
+  const unit=86,pad=34,width=Math.max(520,pad*2+points.length*unit),height=150,yTop=42,yBottom=112;
+  const wrap=document.createElement("div");wrap.className="z-notation-scroll";
+  const NS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("class","z-notation");
+  svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
+  svg.setAttribute("width",width);svg.setAttribute("height",height);
+
+  const defs=document.createElementNS(NS,"defs");
+  defs.innerHTML=`<marker id="adminArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#382052"></path></marker>`;
+  svg.append(defs);
+
+  const xy=(i,p)=>({x:pad+i*unit+unit/2,y:p.fila===ROW_TOP?yTop:yBottom});
+
+  for(let i=0;i<points.length-1;i++) {
+    const a=points[i],b=points[i+1],A=xy(i,a),B=xy(i+1,b);
+    const sameDrag=a.ev===b.ev && a.ev?.tipo==="arrastre";
+
+    if(sameDrag) {
+      const path=document.createElementNS(NS,"path");
+      const mid=(A.x+B.x)/2,cy=Math.max(A.y,B.y)+28;
+      path.setAttribute("d",`M ${A.x+12} ${A.y+8} Q ${mid} ${cy} ${B.x-12} ${B.y+8}`);
+      path.setAttribute("class","z-drag-path");
+      svg.append(path);
+    } else {
+      const line=document.createElementNS(NS,"line");
+      line.setAttribute("x1",A.x+12);line.setAttribute("y1",A.y);
+      line.setAttribute("x2",B.x-15);line.setAttribute("y2",B.y);
+      line.setAttribute("class","z-transition-line");line.setAttribute("marker-end","url(#adminArrow)");
+      svg.append(line);
+    }
+  }
+
+  points.forEach((p,i)=>{
+    const {x,y}=xy(i,p);
+    const text=document.createElementNS(NS,"text");
+    text.setAttribute("x",x);text.setAttribute("y",y+6);text.setAttribute("text-anchor","middle");
+    text.setAttribute("class","z-notation-number");text.textContent=p.tubo;
+    svg.append(text);
+  });
+
+  wrap.append(svg);
+  return wrap;
+}
+
+function renderActiveEditor() {
+  const item=activeItem();
+  $("#partEditor").hidden=true;
+  $("#dividerEditor").hidden=true;
+  $("#noPartSelected").hidden=Boolean(item);
+
+  if(!item) {
+    $("#activePartTitle").textContent="Secuencia de la parte";
+    return;
+  }
+
+  if(item.tipo==="divisor") {
+    $("#dividerEditor").hidden=false;
+    $("#dividerText").value=item.texto||"";
+    $("#activePartTitle").textContent="Comentario / divisor";
+    return;
+  }
+
+  $("#partEditor").hidden=false;
+  $("#partName").value=item.nombre||"";
+  $("#partComment").value=item.comentario||"";
+  $("#activePartTitle").textContent=`Secuencia: ${item.nombre}`;
+  $("#eventCount").textContent=`${item.eventos.length} evento(s)`;
+
+  const host=$("#adminNotation");
+  host.replaceChildren();
+  host.append(renderNotation(item.eventos));
+
+  $("#manualSequence").value=item.eventos
+    .filter(e=>e.tipo==="nota")
+    .map(e=>`${e.fila===ROW_TOP?"S":"I"}${e.tubo}`)
+    .join(" ");
+}
+
+$("#partName").addEventListener("input",()=>{
+  const p=activePart();if(!p)return;p.nombre=$("#partName").value;renderStructureList();$("#activePartTitle").textContent=`Secuencia: ${p.nombre||"Parte"}`;
+});
+$("#partComment").addEventListener("input",()=>{const p=activePart();if(p)p.comentario=$("#partComment").value;});
+$("#dividerText").addEventListener("input",()=>{const x=activeItem();if(x?.tipo==="divisor"){x.texto=$("#dividerText").value;renderStructureList();}});
+
+document.querySelectorAll("[data-record-mode]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    recordMode=btn.dataset.recordMode;
+    pendingDragStart=null;
+    document.querySelectorAll("[data-record-mode]").forEach(x=>x.classList.toggle("active",x===btn));
+    $("#recordHelp").textContent=recordMode==="arrastre"
+      ? "Arrastre: selecciona primero el tubo donde inicia el soplido y luego el tubo donde termina."
+      : "Modo normal: cada clic en un tubo agrega una nota independiente.";
+  });
+});
+
+function registerTubeClick(tube) {
+  const part=activePart();
+  if(!part) return;
+
+  playTube(tube);
+
+  const ref={fila:tube.fila,tubo:tubeCode(tube)};
+  const dur=Number($("#nextDuration").value)||1;
+
+  if(recordMode==="nota") {
+    part.eventos.push({tipo:"nota",...ref,duracion:dur});
+  } else {
+    if(!pendingDragStart) {
+      pendingDragStart=ref;
+      setStatus($("#tubeSaveStatus"),`Inicio del arrastre: ${ref.fila==="superior"?"S":"I"}${ref.tubo}. Selecciona el tubo final.`);
+      return;
+    }
+    part.eventos.push({
+      tipo:"arrastre",
+      desde:pendingDragStart,
+      hasta:ref,
+      duracion:dur
+    });
+    pendingDragStart=null;
+  }
+
+  renderActiveEditor();
+  renderStructureList();
+}
+
+$("#undoEventBtn").addEventListener("click",()=>{
+  const p=activePart();if(!p)return;
+  p.eventos.pop();pendingDragStart=null;renderActiveEditor();renderStructureList();
+});
+
+$("#clearEventsBtn").addEventListener("click",()=>{
+  const p=activePart();if(!p)return;
+  p.eventos=[];pendingDragStart=null;renderActiveEditor();renderStructureList();
+});
+
+async function playEvent(ev) {
+  if(ev.tipo==="arrastre") {
+    const a=getTube(ev.desde.fila,ev.desde.tubo),b=getTube(ev.hasta.fila,ev.hasta.tubo);
+    if(a) playTube(a);
+    await new Promise(r=>setTimeout(r,260));
+    if(b) playTube(b);
+    return;
+  }
+  const t=getTube(ev.fila,ev.tubo);if(t)playTube(t);
+}
+
+$("#playPartBtn").addEventListener("click",async()=>{
+  const p=activePart();if(!p)return;
+  for(const ev of p.eventos) {
+    await playEvent(ev);
+    await new Promise(r=>setTimeout(r,420*Math.max(.5,Number(ev.duracion)||1)));
+  }
+});
+
+$("#applyManualBtn").addEventListener("click",()=>{
+  const p=activePart();if(!p)return;
+  const dur=Number($("#nextDuration").value)||1;
+  const tokens=$("#manualSequence").value.trim().split(/\s+/).filter(Boolean);
+  const parsed=[];
+
+  for(const token of tokens) {
+    const m=token.match(/^([SI])(\d{1,2})$/i);
+    if(!m) continue;
+    const fila=m[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
+    const max=fila===ROW_TOP?12:11;
+    const n=Number(m[2]);
+    if(n>=1 && n<=max) parsed.push({tipo:"nota",fila,tubo:n,duracion:dur});
+  }
+
+  p.eventos=parsed;
+  renderActiveEditor();renderStructureList();
+});
+
+async function loadSongRecord() {
+  const id=$("#songSelect").value;
+  if(!id)return;
+
+  try {
+    const record=await fetchRecord(id);
+    $("#songScale").value=record?.escala||"";
+    $("#songTempo").value=record?.tempo||"";
+    $("#songPublished").checked=Boolean(record?.publicado);
+    structure=hydrateStructure(record);
+    activeItemId=structure[0]?.id||null;
+    pendingDragStart=null;
+    renderStructureList();
+    renderActiveEditor();
+    setStatus($("#songSaveStatus"),record?"Ficha cargada.":"Canción sin ficha de Zampoña.");
+  } catch(e) {
+    setStatus($("#songSaveStatus"),e.message,"error");
+  }
+}
+
+$("#songSelect").addEventListener("change",loadSongRecord);
+
+$("#saveSongRecord").addEventListener("click",async()=>{
+  const payload={
+    cancion_id:$("#songSelect").value,
+    escala:$("#songScale").value.trim(),
+    tempo:$("#songTempo").value?Number($("#songTempo").value):null,
+    publicado:$("#songPublished").checked,
+    secciones:{estructura:structure},
+    updated_at:new Date().toISOString()
+  };
+
+  const {error}=await window.CancioneroDB.client
+    .from("zampona_canciones").upsert(payload,{onConflict:"cancion_id"});
+
+  setStatus($("#songSaveStatus"),error?error.message:"Ficha guardada correctamente.",error?"error":"success");
+});
+
+async function initAdmin() {
+  await loadSongs();
+  await fetchTubes();
+
+  // Normaliza numeración lógica en memoria: posición = número.
+  tubes=tubes.map(t=>({...t,numero:String(t.posicion),etiqueta:String(t.posicion)}));
+  renderInstrument();
+
+  const first=tubes.find(t=>t.fila===ROW_TOP && Number(t.posicion)===1) || tubes[0];
+  if(first)selectTube(first);
+
+  await loadSongRecord();
+}
+
+ensureAdmin().catch(e=>setStatus($("#loginStatus"),e.message,"error"));

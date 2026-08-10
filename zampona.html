@@ -13,15 +13,13 @@
       <strong>Señor Cautivo</strong>
       <span>Cancionero musical</span>
     </div>
-
     <nav class="side-nav">
       <a href="index.html">♫ Cancionero</a>
       <a href="charango.html">🪕 Charango</a>
       <a class="active" href="zampona.html">▥ Zampoña</a>
       <a href="admin.html">⚙ Administración</a>
     </nav>
-
-    <div class="sidebar-foot">Vista pública</div>
+    <div class="sidebar-foot">Guía musical pública</div>
   </aside>
 
   <main class="app">
@@ -30,85 +28,72 @@
         <p class="eyebrow">Guía musical pública</p>
         <h1>Zampoña · Secuencias por canción</h1>
       </div>
-
       <div class="top-controls">
         <label>
           <span>Canción</span>
           <select id="songSelect"></select>
         </label>
-        <a class="ghost reference-link" href="zampona-admin.html">Administrar Zampoña</a>
+        <a class="ghost reference-link" href="zampona-admin.html">⚙ Administrar Zampoña</a>
       </div>
     </header>
 
-    <section class="reference-panel">
-      <div class="reference-copy">
-        <p class="eyebrow">Canción seleccionada</p>
-        <h2 id="songTitle">Cargando…</h2>
-        <p id="songMeta">Los datos provienen del mismo cancionero.</p>
-      </div>
-
-      <div class="reference-actions">
-        <button id="referencePlayBtn" class="primary" type="button" disabled>▶ Escuchar referencia</button>
-        <a id="youtubeBtn" class="ghost reference-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir en YouTube ↗</a>
-        <span id="referenceStart" class="soft-badge">Inicio: 0:00</span>
-      </div>
-
-      <div id="referencePlayerWrap" class="reference-player" hidden>
-        <iframe id="referencePlayer" title="Referencia de YouTube" loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen></iframe>
-      </div>
-    </section>
-
     <section id="notPublished" class="public-empty" hidden>
       <div class="public-empty__symbol">▥</div>
-      <h2>Esta canción todavía no tiene secuencia de Zampoña publicada</h2>
-      <p>Cuando el administrador complete y publique la ficha, aparecerá aquí.</p>
+      <h2>Esta canción todavía no tiene una guía de Zampoña publicada</h2>
+      <p>Cuando el administrador publique sus partes y secuencias aparecerán aquí.</p>
     </section>
 
-    <section id="publicContent" class="zampona-public" hidden>
-      <article class="panel zampona-summary">
-        <div class="summary-item">
-          <span>Tonalidad / escala</span>
-          <strong id="publicScale">—</strong>
+    <section id="publicContent" class="zampona-public-v3" hidden>
+
+      <article class="panel z-instrument-panel">
+        <div class="panel-head">
+          <div><span class="step">1</span><h2>Selecciona un tubo para escucharlo</h2></div>
+          <p>La numeración empieza en el tubo más pequeño y aumenta hacia el más grande.</p>
         </div>
-        <div class="summary-item">
-          <span>Tempo</span>
-          <strong id="publicTempo">—</strong>
-        </div>
-        <div class="summary-item">
-          <span>Tubos configurados</span>
-          <strong id="publicTubeCount">0 / 23</strong>
+
+        <div class="z-instrument-card">
+          <div class="z-row-block">
+            <div class="z-row-label">
+              <strong>Fila superior</strong>
+              <span>12 tubos · 1 pequeño → 12 grande</span>
+            </div>
+            <div id="upperRow" class="z-pipe-row"></div>
+          </div>
+
+          <div class="z-row-block">
+            <div class="z-row-label">
+              <strong>Fila inferior</strong>
+              <span>11 tubos · 1 pequeño → 11 grande</span>
+            </div>
+            <div id="lowerRow" class="z-pipe-row"></div>
+          </div>
         </div>
       </article>
 
-      <article class="panel zampona-sections-panel">
+      <article class="panel z-score-panel">
         <div class="panel-head">
-          <div><span class="step">1</span><h2>Secuencia de la canción</h2></div>
-          <p>Selecciona un número para escucharlo y ubicar su tubo.</p>
-        </div>
-        <div id="publicSections" class="public-sections"></div>
-      </article>
-
-      <article class="panel zampona-instrument-panel">
-        <div class="panel-head">
-          <div><span class="step">2</span><h2>Zampoña interactiva · 12×11</h2></div>
-          <p>Cada tubo usa la configuración publicada por el administrador.</p>
-        </div>
-
-        <div class="zampona-shell">
-          <div class="zampona-rows">
-            <div id="upperRow" class="zampona-row"></div>
-            <div id="lowerRow" class="zampona-row zampona-row--lower"></div>
+          <div><span class="step">2</span><h2>Secuencia registrada</h2></div>
+          <div class="z-score-actions">
+            <button id="playAllBtn" class="primary" type="button">▶ Reproducir secuencia</button>
           </div>
         </div>
 
-        <p class="hint">Haz clic en cualquier tubo para escucharlo. El tubo activo se marca en morado.</p>
+        <div class="z-theme-line">
+          <span>TEMA:</span>
+          <strong id="songTitle">—</strong>
+        </div>
+
+        <div id="publicStructure" class="z-structure"></div>
+
+        <div class="z-notation-legend">
+          <span>↗ ↘ = cambio entre filas</span>
+          <span><b>⌒</b> = arrastre en un mismo soplido</span>
+        </div>
       </article>
     </section>
 
     <footer class="statusbar">
-      <span id="publicStatus">Cargando ficha…</span>
+      <span id="publicStatus">Cargando guía…</span>
       <span>Vista pública · solo lectura</span>
     </footer>
   </main>

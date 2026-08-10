@@ -5,333 +5,433 @@ let tubes = [];
 let currentSong = null;
 let currentRecord = null;
 
-function formatTime(seconds){
-  const total = Math.max(0, Number(seconds) || 0);
-  return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`;
+const ROW_TOP = "superior";
+const ROW_BOTTOM = "inferior";
+
+function tubeHeight(position, row) {
+  const max = row === ROW_TOP ? 12 : 11;
+  const minH = 82;
+  const maxH = 205;
+  const ratio = (Number(position) - 1) / (max - 1);
+  return Math.round(minH + ratio * (maxH - minH)); // pequeño -> grande
 }
 
-function youtubeInfo(song){
-  const raw = String(song?.youtube || "").trim();
-  if(!raw) return null;
-
-  let urlString = raw;
-  if(!/^https?:\/\//i.test(urlString)){
-    urlString = `https://www.youtube.com/watch?v=${encodeURIComponent(urlString)}`;
-  }
-
-  try{
-    const u = new URL(urlString);
-    let id = "";
-
-    if(u.hostname.includes("youtu.be")) id = u.pathname.split("/").filter(Boolean)[0] || "";
-    else if(u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/")) id = u.pathname.split("/")[2] || "";
-    else id = u.searchParams.get("v") || "";
-
-    const start = Math.max(0, Number(song.inicio) || 0);
-    const external = new URL(urlString);
-    external.searchParams.delete("t");
-    external.searchParams.delete("start");
-    if(start) external.searchParams.set("t", `${start}s`);
-
-    if(!id) return {external:external.toString(),embed:"",start};
-
-    const params = new URLSearchParams({rel:"0",modestbranding:"1",playsinline:"1"});
-    if(start) params.set("start",String(start));
-    if(location.protocol === "http:" || location.protocol === "https:"){
-      params.set("origin",location.origin);
-    }
-
-    return {
-      external:external.toString(),
-      embed:`https://www.youtube.com/embed/${encodeURIComponent(id)}?${params.toString()}`,
-      start
-    };
-  }catch{
-    return null;
-  }
+function tubeCode(tube) {
+  return Number(tube?.posicion || tube?.numero || 0);
 }
 
-function updateReference(song){
-  $("#songTitle").textContent = `${song.numero ? song.numero+" · " : ""}${song.titulo}`;
-  $("#songMeta").textContent = song.categoria
-    ? `${song.categoria} · datos compartidos con el cancionero`
-    : "Datos compartidos con el cancionero";
-
-  $("#referenceStart").textContent = `Inicio: ${formatTime(song.inicio)}`;
-
-  const info = youtubeInfo(song);
-  const btn = $("#referencePlayBtn");
-  const yt = $("#youtubeBtn");
-  const wrap = $("#referencePlayerWrap");
-  const iframe = $("#referencePlayer");
-
-  wrap.hidden = true;
-  iframe.removeAttribute("src");
-  btn.textContent = "▶ Escuchar referencia";
-
-  if(!info){
-    btn.disabled = true;
-    btn.dataset.embed = "";
-    yt.hidden = true;
-    return;
-  }
-
-  btn.disabled = !info.embed;
-  btn.dataset.embed = info.embed || "";
-  yt.hidden = false;
-  yt.href = info.external;
+function tubeDisplayNote(tube) {
+  if (!tube?.nota) return "—";
+  const spanish = {
+    C:"Do","C#":"Do#",
+    D:"Re","D#":"Re#",
+    E:"Mi",F:"Fa","F#":"Fa#",
+    G:"Sol","G#":"Sol#",
+    A:"La","A#":"La#",
+    B:"Si"
+  };
+  const m = String(tube.nota).match(/^([A-G](?:#)?)(\d+)?$/);
+  if (!m) return tube.nota;
+  return spanish[m[1]] || m[1];
 }
 
-$("#referencePlayBtn").addEventListener("click",()=>{
-  const btn = $("#referencePlayBtn");
-  const wrap = $("#referencePlayerWrap");
-  const iframe = $("#referencePlayer");
-  const embed = btn.dataset.embed || "";
-  if(!embed) return;
-
-  if(!wrap.hidden){
-    wrap.hidden = true;
-    iframe.removeAttribute("src");
-    btn.textContent = "▶ Escuchar referencia";
-  }else{
-    iframe.src = embed;
-    wrap.hidden = false;
-    btn.textContent = "■ Ocultar referencia";
-  }
-});
-
-function tubeHeight(position,row){
-  const max = row === "superior" ? 12 : 11;
-  const minH = 92;
-  const maxH = 232;
-  const ratio = max <= 1 ? 1 : (position-1)/(max-1);
-  return Math.round(maxH - ratio*(maxH-minH));
-}
-
-function renderTube(tube){
+function renderTube(tube, rowClass="") {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "zampona-tube";
-  btn.style.height = `${tubeHeight(Number(tube.posicion),tube.fila)}px`;
-  btn.dataset.tubeId = tube.id;
+  btn.className = `z-pipe ${rowClass}`;
+  btn.style.height = `${tubeHeight(tube.posicion, tube.fila)}px`;
+  btn.dataset.id = tube.id;
 
-  const cap = document.createElement("span");
-  cap.className = "zampona-tube__cap";
+  btn.innerHTML = `
+    <span class="z-pipe-hole"></span>
+    <span class="z-pipe-number">${tubeCode(tube)}</span>
+    <span class="z-pipe-note">${tubeDisplayNote(tube)}</span>
+    <small>${tube.nota || ""}</small>
+  `;
 
-  const note = document.createElement("span");
-  note.className = "zampona-tube__note";
-  note.textContent = tube.nota || "";
-
-  const label = document.createElement("span");
-  label.className = "zampona-tube__label";
-  label.textContent = tube.etiqueta || tube.numero || tube.posicion;
-
-  btn.append(cap,note,label);
-  btn.addEventListener("click",()=>playTube(tube,true));
+  btn.addEventListener("click", () => playTube(tube, true));
   return btn;
 }
 
-function renderInstrument(){
-  const upper = $("#upperRow");
-  const lower = $("#lowerRow");
-  upper.replaceChildren();
-  lower.replaceChildren();
+function renderInstrument() {
+  const top = $("#upperRow");
+  const bottom = $("#lowerRow");
+  top.replaceChildren();
+  bottom.replaceChildren();
 
   tubes
-    .filter(t=>t.fila==="superior")
-    .sort((a,b)=>a.posicion-b.posicion)
-    .forEach(t=>upper.append(renderTube(t)));
+    .filter(t => t.fila === ROW_TOP)
+    .sort((a,b) => Number(a.posicion)-Number(b.posicion))
+    .forEach(t => top.append(renderTube(t,"is-top")));
 
   tubes
-    .filter(t=>t.fila==="inferior")
-    .sort((a,b)=>a.posicion-b.posicion)
-    .forEach(t=>lower.append(renderTube(t)));
-
-  $("#publicTubeCount").textContent = `${tubes.length} / 23`;
+    .filter(t => t.fila === ROW_BOTTOM)
+    .sort((a,b) => Number(a.posicion)-Number(b.posicion))
+    .forEach(t => bottom.append(renderTube(t,"is-bottom")));
 }
 
-function highlightTube(tube){
-  document.querySelectorAll(".zampona-tube").forEach(x=>x.classList.remove("is-active"));
-  const el = document.querySelector(`[data-tube-id="${tube.id}"]`);
-  if(el){
-    el.classList.add("is-active");
-    el.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
-    setTimeout(()=>el.classList.remove("is-active"),650);
-  }
+function highlightTube(tube) {
+  document.querySelectorAll(".z-pipe").forEach(x => x.classList.remove("is-active"));
+  const el = document.querySelector(`.z-pipe[data-id="${tube.id}"]`);
+  if (!el) return;
+  el.classList.add("is-active");
+  setTimeout(() => el.classList.remove("is-active"), 500);
 }
 
-function playFrequency(freq){
-  const value = Number(freq);
-  if(!value || value<=0) return;
-
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+function synth(freq, duration=.72) {
+  const f = Number(freq);
+  if (!f) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
   const now = ctx.currentTime;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   const filter = ctx.createBiquadFilter();
 
   osc.type = "sine";
-  osc.frequency.value = value;
+  osc.frequency.value = f;
   filter.type = "lowpass";
-  filter.frequency.value = 1800;
-
-  gain.gain.setValueAtTime(.0001,now);
-  gain.gain.exponentialRampToValueAtTime(.13,now+.025);
-  gain.gain.exponentialRampToValueAtTime(.0001,now+.75);
+  filter.frequency.value = 1500;
+  gain.gain.setValueAtTime(.0001, now);
+  gain.gain.exponentialRampToValueAtTime(.12, now + .025);
+  gain.gain.exponentialRampToValueAtTime(.0001, now + Math.max(.3,duration));
 
   osc.connect(filter).connect(gain).connect(ctx.destination);
   osc.start(now);
-  osc.stop(now+.8);
+  osc.stop(now + Math.max(.35,duration) + .05);
 }
 
-function playTube(tube,highlight=false){
-  if(highlight) highlightTube(tube);
-  playFrequency(tube.frecuencia);
+function playTube(tube, highlight=false, duration=1) {
+  if (highlight) highlightTube(tube);
+  synth(tube.frecuencia, .55 * Math.max(.5, Number(duration)||1));
 }
 
-function findTube(token){
-  const key = String(token || "").trim().toLowerCase();
-  return tubes.find(t =>
-    String(t.id)===key ||
-    String(t.numero || "").toLowerCase()===key ||
-    String(t.etiqueta || "").toLowerCase()===key ||
-    String(t.nota || "").toLowerCase()===key
-  );
+function findTube(fila, numero) {
+  return tubes.find(t => t.fila === fila && tubeCode(t) === Number(numero));
 }
 
-function renderSections(record){
-  const container = $("#publicSections");
-  container.replaceChildren();
+function legacyToStructure(secciones) {
   const labels = {intro:"Intro",verso:"Verso",coro:"Coro",puente:"Puente",final:"Final"};
-  const sections = record?.secciones || {};
+  const result = [];
+  Object.entries(labels).forEach(([key,label]) => {
+    const raw = secciones?.[key];
+    if (!raw) return;
 
-  Object.entries(labels).forEach(([key,label])=>{
-    const values = Array.isArray(sections[key]) ? sections[key] : [];
-    if(!values.length) return;
+    let values = [];
+    let comment = "";
 
-    const section = document.createElement("section");
-    section.className = "zampona-section";
+    if (Array.isArray(raw)) values = raw;
+    else if (typeof raw === "object") {
+      comment = String(raw.comentario || "");
+      if (Array.isArray(raw.eventos)) {
+        result.push({
+          id:`legacy-${key}`,
+          tipo:"parte",
+          nombre:label,
+          comentario:comment,
+          eventos:raw.eventos.map(ev => normalizeEvent(ev)).filter(Boolean)
+        });
+        return;
+      }
+    }
 
-    const h3 = document.createElement("h3");
-    h3.textContent = label;
-
-    const row = document.createElement("div");
-    row.className = "zampona-sequence";
-
-    values.forEach(token=>{
-      if(String(token).trim().startsWith("#")){ const note=document.createElement("div"); note.className="section-comment"; note.textContent=String(token).trim().slice(1).trim(); row.append(note); return; }
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "zampona-note-chip";
-      btn.textContent = token;
-      btn.addEventListener("click",()=>{
-        const tube = findTube(token);
-        if(tube) playTube(tube,true);
+    if (values.length || comment) {
+      result.push({
+        id:`legacy-${key}`,
+        tipo:"parte",
+        nombre:label,
+        comentario:comment,
+        eventos: values.map(v => {
+          const n = Number(v);
+          return Number.isFinite(n)
+            ? {tipo:"nota", fila:ROW_TOP, tubo:n, duracion:1}
+            : null;
+        }).filter(Boolean)
       });
-      row.append(btn);
-    });
-
-    section.append(h3,row);
-    container.append(section);
+    }
   });
+  return result;
 }
 
-async function fetchPublicRecord(songId){
-  const client = window.CancioneroDB?.client;
-  if(!client) return null;
+function normalizeEvent(ev) {
+  if (!ev) return null;
 
-  const {data,error} = await client
-    .from("zampona_canciones")
-    .select("*")
-    .eq("cancion_id",songId)
-    .eq("publicado",true)
-    .maybeSingle();
+  if (ev.tipo === "arrastre" && ev.desde && ev.hasta) {
+    return {
+      tipo:"arrastre",
+      desde:{fila:ev.desde.fila, tubo:Number(ev.desde.tubo)},
+      hasta:{fila:ev.hasta.fila, tubo:Number(ev.hasta.tubo)},
+      duracion:Number(ev.duracion)||1
+    };
+  }
 
-  if(error) throw error;
-  return data;
+  if (ev.tipo === "nota") {
+    return {
+      tipo:"nota",
+      fila:ev.fila || ROW_TOP,
+      tubo:Number(ev.tubo),
+      duracion:Number(ev.duracion)||1
+    };
+  }
+
+  if (typeof ev === "object" && ev.tubo != null) {
+    return {
+      tipo:"nota",
+      fila:ev.fila || ROW_TOP,
+      tubo:Number(ev.tubo),
+      duracion:Number(ev.duracion)||1
+    };
+  }
+
+  return null;
 }
 
-async function fetchTubes(){
-  const client = window.CancioneroDB?.client;
-  if(!client) return [];
+function getStructure(record) {
+  const raw = record?.secciones || {};
+  if (Array.isArray(raw.estructura)) {
+    return raw.estructura.map(item => {
+      if (item.tipo === "divisor") {
+        return {
+          id:item.id || crypto.randomUUID(),
+          tipo:"divisor",
+          texto:String(item.texto || item.comentario || "")
+        };
+      }
+      return {
+        id:item.id || crypto.randomUUID(),
+        tipo:"parte",
+        nombre:String(item.nombre || "Parte"),
+        comentario:String(item.comentario || ""),
+        eventos:(item.eventos || []).map(normalizeEvent).filter(Boolean)
+      };
+    });
+  }
+  return legacyToStructure(raw);
+}
 
-  const {data,error} = await client
-    .from("zampona_tubos")
-    .select("*")
-    .eq("publicado",true)
-    .order("fila")
-    .order("posicion");
+function eventPoints(events) {
+  const pts = [];
+  events.forEach(ev => {
+    if (ev.tipo === "arrastre") {
+      pts.push({kind:"drag-start", fila:ev.desde.fila, tubo:ev.desde.tubo, ev});
+      pts.push({kind:"drag-end", fila:ev.hasta.fila, tubo:ev.hasta.tubo, ev});
+    } else {
+      pts.push({kind:"note", fila:ev.fila, tubo:ev.tubo, ev});
+    }
+  });
+  return pts;
+}
 
+function renderNotation(events, interactive=false, onClick=null) {
+  const points = eventPoints(events);
+  const unit = 86;
+  const pad = 34;
+  const width = Math.max(520, pad*2 + points.length * unit);
+  const height = 150;
+  const yTop = 42;
+  const yBottom = 112;
+
+  const wrap = document.createElement("div");
+  wrap.className = "z-notation-scroll";
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS,"svg");
+  svg.setAttribute("class","z-notation");
+  svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
+  svg.setAttribute("width",width);
+  svg.setAttribute("height",height);
+
+  const defs = document.createElementNS(svgNS,"defs");
+  defs.innerHTML = `
+    <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#382052"></path>
+    </marker>
+  `;
+  svg.append(defs);
+
+  function pointXY(index,p) {
+    return {x:pad + index*unit + unit/2, y:p.fila===ROW_TOP ? yTop : yBottom};
+  }
+
+  // connectors between consecutive visible points
+  for (let i=0;i<points.length-1;i++) {
+    const a=points[i], b=points[i+1];
+    // Internal connection of an arrastre gets curved line, no arrow.
+    const sameDrag = a.ev === b.ev && a.ev?.tipo === "arrastre";
+    const A=pointXY(i,a), B=pointXY(i+1,b);
+
+    if (sameDrag) {
+      const path=document.createElementNS(svgNS,"path");
+      const midX=(A.x+B.x)/2;
+      const curveY=Math.max(A.y,B.y)+28;
+      path.setAttribute("d",`M ${A.x+12} ${A.y+8} Q ${midX} ${curveY} ${B.x-12} ${B.y+8}`);
+      path.setAttribute("class","z-drag-path");
+      svg.append(path);
+    } else {
+      const line=document.createElementNS(svgNS,"line");
+      line.setAttribute("x1",A.x+12);
+      line.setAttribute("y1",A.y);
+      line.setAttribute("x2",B.x-15);
+      line.setAttribute("y2",B.y);
+      line.setAttribute("class","z-transition-line");
+      line.setAttribute("marker-end","url(#arrowHead)");
+      svg.append(line);
+    }
+  }
+
+  points.forEach((p,index)=>{
+    const {x,y}=pointXY(index,p);
+    const text=document.createElementNS(svgNS,"text");
+    text.setAttribute("x",x);
+    text.setAttribute("y",y+6);
+    text.setAttribute("text-anchor","middle");
+    text.setAttribute("class","z-notation-number");
+    text.textContent=p.tubo;
+    if (interactive && onClick) {
+      text.style.cursor="pointer";
+      text.addEventListener("click",()=>onClick(index,p));
+    }
+    svg.append(text);
+
+    if (Number(p.ev?.duracion)!==1 && p.kind!=="drag-end") {
+      const dur=document.createElementNS(svgNS,"text");
+      dur.setAttribute("x",x);
+      dur.setAttribute("y",y-18);
+      dur.setAttribute("text-anchor","middle");
+      dur.setAttribute("class","z-duration-label");
+      dur.textContent=`×${p.ev.duracion}`;
+      svg.append(dur);
+    }
+  });
+
+  wrap.append(svg);
+  return wrap;
+}
+
+function renderStructure(record) {
+  const host=$("#publicStructure");
+  host.replaceChildren();
+  const structure=getStructure(record);
+
+  structure.forEach(item=>{
+    if(item.tipo==="divisor"){
+      const div=document.createElement("div");
+      div.className="z-divider";
+      div.innerHTML=`<span></span><strong>${item.texto || "Comentario"}</strong><span></span>`;
+      host.append(div);
+      return;
+    }
+
+    const section=document.createElement("section");
+    section.className="z-part";
+
+    const side=document.createElement("div");
+    side.className="z-part-label";
+    side.innerHTML=`<strong>${item.nombre}</strong>${item.comentario?`<small>${item.comentario}</small>`:""}`;
+
+    const score=document.createElement("div");
+    score.className="z-part-score";
+    score.append(renderNotation(item.eventos));
+
+    section.append(side,score);
+    host.append(section);
+  });
+
+  if (!structure.length) {
+    const empty=document.createElement("div");
+    empty.className="z-empty-score";
+    empty.textContent="Aún no se registraron partes para esta canción.";
+    host.append(empty);
+  }
+}
+
+async function playEvent(ev) {
+  if (ev.tipo === "arrastre") {
+    const first=findTube(ev.desde.fila,ev.desde.tubo);
+    const second=findTube(ev.hasta.fila,ev.hasta.tubo);
+    if(first) playTube(first,true,.8);
+    await new Promise(r=>setTimeout(r,260));
+    if(second) playTube(second,true,.8);
+    return;
+  }
+  const t=findTube(ev.fila,ev.tubo);
+  if(t) playTube(t,true,ev.duracion);
+}
+
+async function playAll() {
+  if(!currentRecord) return;
+  const structure=getStructure(currentRecord);
+  for(const item of structure) {
+    if(item.tipo!=="parte") continue;
+    for(const ev of item.eventos) {
+      await playEvent(ev);
+      await new Promise(r=>setTimeout(r,420*Math.max(.5,Number(ev.duracion)||1)));
+    }
+  }
+}
+
+$("#playAllBtn").addEventListener("click",playAll);
+
+async function fetchTubes() {
+  const {data,error}=await window.CancioneroDB.client
+    .from("zampona_tubos").select("*").eq("publicado",true).order("fila").order("posicion");
   if(error) throw error;
   return data || [];
 }
 
-function showRecord(record){
-  currentRecord = record;
-  const has = Boolean(record);
-
-  $("#notPublished").hidden = has;
-  $("#publicContent").hidden = !has;
-
-  if(!has){
-    $("#publicStatus").textContent = "Sin ficha pública para esta canción";
-    return;
-  }
-
-  $("#publicScale").textContent = record.escala || "—";
-  $("#publicTempo").textContent = record.tempo ? `${record.tempo} BPM` : "—";
-  renderSections(record);
-  renderInstrument();
-  $("#publicStatus").textContent = "Ficha pública cargada";
+async function fetchRecord(songId) {
+  const {data,error}=await window.CancioneroDB.client
+    .from("zampona_canciones").select("*").eq("cancion_id",songId).eq("publicado",true).maybeSingle();
+  if(error) throw error;
+  return data;
 }
 
-async function loadSelectedSong(){
-  const id = $("#songSelect").value;
-  currentSong = songs.find(s=>String(s.id)===id) || songs[0];
+async function loadSelectedSong() {
+  currentSong=songs.find(s=>String(s.id)===$("#songSelect").value)||songs[0];
   if(!currentSong) return;
+  $("#songTitle").textContent=currentSong.titulo || "—";
 
-  updateReference(currentSong);
-
-  const url = new URL(location.href);
-  url.searchParams.set("song",currentSong.id || currentSong.numero);
-  history.replaceState(null,"",url);
-
-  try{
-    const record = await fetchPublicRecord(currentSong.id);
-    showRecord(record);
-  }catch(error){
-    console.error(error);
-    showRecord(null);
-    $("#publicStatus").textContent = "No se pudo cargar la ficha de Zampoña";
+  try {
+    currentRecord=await fetchRecord(currentSong.id);
+    const has=Boolean(currentRecord);
+    $("#notPublished").hidden=has;
+    $("#publicContent").hidden=!has;
+    if(has) {
+      renderInstrument();
+      renderStructure(currentRecord);
+      $("#publicStatus").textContent="Guía cargada";
+    } else {
+      $("#publicStatus").textContent="Sin guía publicada";
+    }
+  } catch(e) {
+    console.error(e);
+    $("#publicStatus").textContent=e.message || "No se pudo cargar Zampoña";
   }
 }
 
-async function init(){
-  try{
-    songs = await window.CancioneroDB.listSongs();
-    tubes = await fetchTubes();
+async function init() {
+  try {
+    songs=await window.CancioneroDB.listSongs();
+    tubes=await fetchTubes();
 
-    const select = $("#songSelect");
+    const select=$("#songSelect");
     select.replaceChildren();
-
     songs.forEach(song=>{
-      const opt = document.createElement("option");
-      opt.value = song.id;
-      opt.textContent = `${song.numero ? song.numero+" · " : ""}${song.titulo}`;
+      const opt=document.createElement("option");
+      opt.value=song.id;
+      opt.textContent=`${song.numero ? song.numero+" · " : ""}${song.titulo}`;
       select.append(opt);
     });
 
-    const requested = new URLSearchParams(location.search).get("song");
-    if(requested){
-      const match = songs.find(s=>String(s.id)===requested || String(s.numero)===requested);
-      if(match) select.value = match.id;
-    }
+    const requested=new URLSearchParams(location.search).get("song");
+    const match=songs.find(s=>String(s.id)===requested || String(s.numero)===requested);
+    if(match) select.value=match.id;
 
     select.addEventListener("change",loadSelectedSong);
     await loadSelectedSong();
-  }catch(error){
-    console.error(error);
-    $("#publicStatus").textContent = error.message || "No se pudo cargar Zampoña";
+  } catch(e) {
+    console.error(e);
+    $("#publicStatus").textContent=e.message || "No se pudo iniciar Zampoña";
   }
 }
 
