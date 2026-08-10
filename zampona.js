@@ -219,6 +219,7 @@ function renderSections(record){
     row.className = "zampona-sequence";
 
     values.forEach(token=>{
+      if(String(token).trim().startsWith("#")){ const note=document.createElement("div"); note.className="section-comment"; note.textContent=String(token).trim().slice(1).trim(); row.append(note); return; }
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "zampona-note-chip";

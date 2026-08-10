@@ -77,6 +77,7 @@
             <label>
               <span>Ritmo / rasgueo</span>
               <input id="songStrum" type="text" placeholder="Ej.: ↓ ↓↑ ↑↓↑">
+              <div class="strum-buttons"><button type="button" data-strum="↓">↓ Abajo</button><button type="button" data-strum="↑">↑ Arriba</button><button type="button" data-strum="×">× Apagado</button><button type="button" data-strum="·">· Pausa</button></div>
             </label>
 
             <label class="publish-row">
@@ -87,7 +88,7 @@
 
           <div class="admin-section-editor">
             <h3>Progresión por partes</h3>
-            <p class="admin-help">Escribe acordes separados por espacios o guiones. Ej.: G - D - Em - C</p>
+            <p class="admin-help">Un acorde por pulso: G - D - Em. Dos acordes en el mismo pulso: Am/Dm. Para un comentario escribe # antes del texto, por ejemplo: #Repetir verso + coro.</p>
 
             <label><span>Intro</span><input id="secIntro" type="text"></label>
             <label><span>Verso</span><input id="secVerso" type="text"></label>
@@ -150,13 +151,14 @@
                 <button class="finger-select" data-finger="4" type="button">4</button>
               </div>
 
+              <label class="fret-count-control"><span>Trastes visibles</span><input id="fretCount" type="number" min="5" max="15" value="8"></label>
               <div id="fingerEditorWrap">
                 <div id="adminNeck" class="admin-neck"></div>
               </div>
 
               <div id="barreEditor" hidden>
                 <div class="barre-builder">
-                  <label><span>Traste</span><select id="barreFret"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+                  <label><span>Traste</span><select id="barreFret"></select></label>
                   <label><span>Desde orden</span><select id="barreFrom"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
                   <label><span>Hasta orden</span><select id="barreTo"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
                   <label><span>Dedo</span><select id="barreFinger"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
@@ -173,6 +175,7 @@
                 <label><input class="open-string-check" value="4" type="checkbox">4</label>
                 <label><input class="open-string-check" value="5" type="checkbox">5</label>
               </div>
+              <div class="muted-strings-admin"><span>Órdenes muteados:</span><label><input class="muted-string-check" value="1" type="checkbox">1</label><label><input class="muted-string-check" value="2" type="checkbox">2</label><label><input class="muted-string-check" value="3" type="checkbox">3</label><label><input class="muted-string-check" value="4" type="checkbox">4</label><label><input class="muted-string-check" value="5" type="checkbox">5</label></div>
 
               <div class="form-actions">
                 <button id="saveChordBtn" class="primary" type="button">Guardar acorde</button>

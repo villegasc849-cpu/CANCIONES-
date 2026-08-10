@@ -2,13 +2,17 @@ const $ = (q) => document.querySelector(q);
 
 let songs = [];
 let tubes = [];
+let tubeRecording = false;
 
 function setStatus(el,text,type=""){
   el.textContent = text;
   el.className = `status-message${type ? ` is-${type}` : ""}`;
 }
 function parseSequence(value){
-  return String(value || "").split(/[\s,;|]+/).map(x=>x.trim()).filter(Boolean);
+  const raw=String(value || "").trim();
+  if(!raw) return [];
+  if(raw.startsWith("#")) return [raw];
+  return raw.split(/[\s,;|]+/).map(x=>x.trim()).filter(Boolean);
 }
 function joinSequence(arr){ return Array.isArray(arr) ? arr.join(" ") : ""; }
 
@@ -132,7 +136,7 @@ function renderAdminMap(){
     const span=document.createElement("span");
     span.textContent=existing?.etiqueta || existing?.numero || slot.posicion;
     btn.append(span);
-    btn.addEventListener("click",()=>existing ? fillTube(existing) : fillEmptySlot(slot));
+    btn.addEventListener("click",()=>{ if(tubeRecording && existing){ appendTubeToSection(existing); playFrequency(existing.frecuencia); flashAdminTube(btn); } else existing ? fillTube(existing) : fillEmptySlot(slot); });
     (slot.fila==="superior" ? upper : lower).append(btn);
   });
 }
@@ -293,6 +297,12 @@ $("#saveTubeBtn").addEventListener("click",async()=>{
   const saved=getTubeAt(row,position);
   if(saved) fillTube(saved);
 });
+
+function sectionInput(key){ return $("#sec"+key.charAt(0).toUpperCase()+key.slice(1)); }
+function appendTubeToSection(tube){ const input=sectionInput($("#recordSection").value); if(!input)return; const token=tube.etiqueta||tube.numero||tube.posicion; input.value=(input.value+" "+token).trim(); input.dispatchEvent(new Event("input")); }
+function flashAdminTube(el){ el.classList.add("is-playing"); setTimeout(()=>el.classList.remove("is-playing"),350); }
+$("#toggleTubeRecording")?.addEventListener("click",()=>{tubeRecording=!tubeRecording; const b=$("#toggleTubeRecording"); b.classList.toggle("active",tubeRecording); b.textContent=tubeRecording?"● Registrando: toca los tubos":"● Activar registro por tubos";});
+$("#undoTubeNote")?.addEventListener("click",()=>{const input=sectionInput($("#recordSection").value); if(!input)return; const a=parseSequence(input.value);a.pop();input.value=a.join(" ");});
 
 async function initAdmin(){
   await loadSongs();

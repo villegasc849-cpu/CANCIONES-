@@ -318,3 +318,32 @@ select:focus,input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
   .two-cols,.zampona-fields,.barre-builder{grid-template-columns:1fr}
   .fretboard,.admin-neck{height:300px}
 }
+
+/* ===== Rediseño musical v2: instrumentos más amigables ===== */
+.chord-beat{display:inline-flex;align-items:center;gap:4px;padding:5px;border:1px solid #ead8aa;border-radius:13px;background:linear-gradient(180deg,#fffdf8,#fbf1df);box-shadow:0 3px 10px rgba(60,35,20,.05)}
+.chord-beat small{padding:0 5px;color:var(--muted);font:9px Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em}
+.section-comment{flex:1 0 100%;padding:11px 14px;border-left:4px solid var(--gold);border-radius:0 10px 10px 0;background:#fff7df;color:#6c5730;font-style:italic}
+.public-sequence{align-items:center}
+.fretboard-wrap{max-width:760px;margin:auto}
+.fret-numbers{display:grid!important;grid-template-columns:repeat(var(--fret-count,8),1fr);gap:0;padding:0 8%;margin-bottom:4px;color:#8a725c;font:11px Arial,sans-serif;text-align:center}
+.fretboard.charango-instrument{height:520px;width:min(100%,430px);padding:48px 16% 35px;background:linear-gradient(90deg,#c58a52 0,#e4b67d 8%,#a86638 18%,#d79b60 38%,#a96035 58%,#dcaa72 78%,#a65f36 100%);border:8px solid #704021;border-radius:22px 22px 36px 36px;box-shadow:inset 0 0 25px rgba(60,25,8,.22),0 14px 30px rgba(60,35,20,.14)}
+.fretboard.charango-instrument .fretboard-neck{left:16%;right:16%;top:48px;bottom:35px}
+.fretboard.charango-instrument .fretboard-nut{background:#f0dfba;height:10px;box-shadow:0 2px 3px rgba(0,0,0,.25)}
+.fretboard.charango-instrument .fret-line{height:3px;background:linear-gradient(#f4f4f4,#7f7f7f,#f2f2f2);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.fretboard.charango-instrument .string-line{width:2px;background:linear-gradient(90deg,#666,#fff,#777);box-shadow:1px 0 1px rgba(0,0,0,.35)}
+.fretboard.charango-instrument .open-marker{background:#f8ecd1;border-color:#3a2518}
+.fretboard.charango-instrument .muted-marker{color:#3a2518}
+.fretboard.charango-instrument .finger-dot,.fretboard.charango-instrument .barre{box-shadow:0 3px 10px rgba(49,20,80,.38)}
+.fret-count-control{max-width:180px}.strum-buttons{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.strum-buttons button{padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fffdf9;color:var(--purple);font-weight:700}.strum-buttons button:hover{border-color:var(--gold);background:#fff6dd}
+.open-strings-admin,.muted-strings-admin{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fffdf9}.open-strings-admin input,.muted-strings-admin input{width:auto}
+.admin-neck{height:500px;width:min(100%,430px);background:linear-gradient(90deg,#bd7d48,#dfa86f,#a45e35,#d99d63,#9d5932,#d9a36d,#a65f35);border:7px solid #704021}.admin-neck-inner{left:15%;right:15%;top:42px;bottom:28px}
+.zampona-record-toolbar{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff9ed}.zampona-record-toolbar label{display:grid;gap:4px}.zampona-record-toolbar .active{background:var(--purple);color:white;border-color:var(--purple)}
+.zampona-shell{background:radial-gradient(circle at 50% 20%,#fffdf7,#f5e6ca);padding:30px 18px;border-radius:24px;box-shadow:inset 0 0 35px rgba(122,76,30,.08)}
+.zampona-rows{gap:0;align-items:center}.zampona-row{min-height:280px;gap:3px;padding:18px 8px 0}.zampona-row--lower{margin-top:-120px;padding-top:0;transform:translateX(22px)}
+.zampona-tube{flex-basis:46px;min-width:46px;border-color:#855127;border-radius:18px 18px 7px 7px;background:linear-gradient(90deg,#8d5729 0,#e8b566 12%,#f3ca7b 38%,#c8843f 72%,#78451f 100%);box-shadow:inset 3px 0 4px rgba(255,255,255,.35),inset -4px 0 5px rgba(62,29,7,.25),0 7px 12px rgba(76,42,15,.16)}
+.zampona-tube__cap{top:4px;width:34px;height:12px;background:radial-gradient(ellipse,#1d120a 25%,#5b3519 45%,#d69b55 70%)}
+.zampona-tube__label{bottom:auto;top:22px;width:29px;height:29px;padding:6px 1px;border-radius:50%;background:rgba(255,245,215,.88);border:1px solid #6e421f;color:#34200f}
+.zampona-tube__note{bottom:auto;top:54px;color:#3b230f;font-size:9px}.zampona-tube.is-active{transform:translateY(-8px);filter:saturate(1.15);box-shadow:0 0 0 4px rgba(74,43,120,.2),0 12px 20px rgba(74,43,120,.2)}
+.zampona-admin-tube.is-playing{border-color:var(--purple);transform:translateY(-5px);box-shadow:0 0 0 4px rgba(74,43,120,.18)}
+.zampona-note-chip{border-radius:999px;background:linear-gradient(180deg,#fff8df,#f4e3b5);border-color:#d7b86d;box-shadow:0 3px 8px rgba(60,35,20,.07)}
+@media(max-width:650px){.fretboard.charango-instrument,.admin-neck{height:430px;width:min(100%,350px)}.zampona-tube{flex-basis:38px;min-width:38px}.zampona-row--lower{transform:translateX(12px)}}

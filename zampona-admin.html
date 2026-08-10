@@ -87,7 +87,8 @@
 
           <div class="admin-section-editor">
             <h3>Secuencias por partes</h3>
-            <p class="admin-help">Escribe los números/etiquetas de los tubos separados por espacios. Ej.: 5 5 1 23 3 2</p>
+            <p class="admin-help">Puedes escribir la secuencia o activar el registro interactivo y tocar los tubos de la zampoña. Para comentarios usa # al inicio.</p>
+            <div class="zampona-record-toolbar"><label><span>Registrar clics en</span><select id="recordSection"><option value="intro">Intro</option><option value="verso">Verso</option><option value="coro">Coro</option><option value="puente">Puente</option><option value="final">Final</option></select></label><button id="toggleTubeRecording" class="ghost" type="button">● Activar registro por tubos</button><button id="undoTubeNote" class="ghost" type="button">↶ Deshacer</button></div>
 
             <label><span>Intro</span><input id="secIntro" type="text"></label>
             <label><span>Verso</span><input id="secVerso" type="text"></label>

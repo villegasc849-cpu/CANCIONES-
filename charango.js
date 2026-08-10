@@ -92,9 +92,13 @@ $("#referencePlayBtn").addEventListener("click", () => {
   }
 });
 
+function sectionTokens(record){ return Object.values(record?.secciones || {}).flat().filter(Boolean); }
+function chordNamesFromToken(token){
+  if(typeof token !== "string" || token.trim().startsWith("#")) return [];
+  return token.split("/").map(x=>x.trim()).filter(Boolean);
+}
 function uniqueChords(record) {
-  const sections = record?.secciones || {};
-  return [...new Set(Object.values(sections).flat().filter(Boolean))];
+  return [...new Set(sectionTokens(record).flatMap(chordNamesFromToken))];
 }
 
 function renderSections(record) {
@@ -114,13 +118,16 @@ function renderSections(record) {
     const row = document.createElement("div");
     row.className = "sequence public-sequence";
 
-    values.forEach(name => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chord-chip";
-      btn.textContent = name;
-      btn.addEventListener("click", () => selectChord(name));
-      row.append(btn);
+    values.forEach(token => {
+      if(String(token).trim().startsWith("#")){
+        const note=document.createElement("div"); note.className="section-comment";
+        note.textContent=String(token).trim().slice(1).trim(); row.append(note); return;
+      }
+      const names=chordNamesFromToken(token);
+      const beat=document.createElement("div"); beat.className="chord-beat";
+      names.forEach(name=>{ const btn=document.createElement("button"); btn.type="button"; btn.className="chord-chip"; btn.textContent=name; btn.addEventListener("click",()=>selectChord(name)); beat.append(btn); });
+      if(names.length>1){ const tag=document.createElement("small"); tag.textContent="mismo tiempo"; beat.append(tag); }
+      row.append(beat);
     });
     section.append(h3, row);
     container.append(section);
@@ -148,10 +155,13 @@ function renderUsedChords(record) {
 function xForOrder(order) {
   return ((Number(order) - 1) / 4) * 100;
 }
-function yForFret(fret) {
-  return ((Number(fret) - 0.5) / 5) * 100;
+let visibleFrets=8;
+function yForFret(fret) { return ((Number(fret) - 0.5) / visibleFrets) * 100; }
+function maxFretFor(data){
+  const fingers=(data?.digitacion||[]).map(x=>Number(x.traste)||0);
+  const bars=(data?.cejillas||[]).map(x=>Number(x.traste)||0);
+  return Math.max(5,...fingers,...bars);
 }
-
 function buildNeckBase(board) {
   const neck = document.createElement("div");
   neck.className = "fretboard-neck";
@@ -160,11 +170,9 @@ function buildNeckBase(board) {
   nut.className = "fretboard-nut";
   neck.append(nut);
 
-  for (let fret = 1; fret <= 5; fret++) {
-    const line = document.createElement("span");
-    line.className = "fret-line";
-    line.style.top = `${(fret / 5) * 100}%`;
-    neck.append(line);
+  for (let fret = 1; fret <= visibleFrets; fret++) {
+    const line = document.createElement("span"); line.className = "fret-line";
+    line.style.top = `${(fret / visibleFrets) * 100}%`; neck.append(line);
   }
 
   for (let order = 1; order <= 5; order++) {
@@ -179,10 +187,10 @@ function buildNeckBase(board) {
 }
 
 function renderFretboard(data) {
-  const board = $("#fretboard");
-  board.replaceChildren();
+  const board = $("#fretboard"); board.replaceChildren();
+  visibleFrets=Math.max(8,maxFretFor(data)+1);
+  const nums=$("#fretNumbers"); if(nums){ nums.style.gridTemplateColumns=`repeat(${visibleFrets},1fr)`; nums.replaceChildren(); for(let i=1;i<=visibleFrets;i++){const x=document.createElement("span");x.textContent=i===1?"Traste 1":i;nums.append(x);} }
   const neck = buildNeckBase(board);
-
   if (!data) return;
 
   const open = new Set((Array.isArray(data.abiertas) ? data.abiertas : []).map(Number));

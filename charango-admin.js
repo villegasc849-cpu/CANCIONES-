@@ -6,13 +6,17 @@ let currentFinger = 1;
 let currentMode = "dedo";
 let currentFingering = [];
 let currentBarres = [];
+let adminFretCount = 8;
 
 function setStatus(el, text, type = "") {
   el.textContent = text;
   el.className = `status-message${type ? ` is-${type}` : ""}`;
 }
 function parseSequence(value) {
-  return String(value || "").split(/[\s,\-–—>→]+/).map(x => x.trim()).filter(Boolean);
+  const raw=String(value || "").trim();
+  if(!raw) return [];
+  if(raw.startsWith("#")) return [raw];
+  return raw.split(/[\s,\-–—>→]+/).map(x => x.trim()).filter(Boolean);
 }
 function joinSequence(arr) {
   return Array.isArray(arr) ? arr.join(" - ") : "";
@@ -149,7 +153,8 @@ function clearChordEditor() {
   $("#deleteChordBtn").hidden = true;
   currentFingering = [];
   currentBarres = [];
-  document.querySelectorAll(".open-string-check").forEach(x => x.checked = false);
+  document.querySelectorAll(".open-string-check,.muted-string-check").forEach(x => x.checked = false);
+  populateBarreFrets();
   renderAdminNeck();
   renderBarreList();
   setStatus($("#chordSaveStatus"), "");
@@ -174,8 +179,11 @@ function fillChord(chord) {
     : [];
 
   const open = Array.isArray(chord.abiertas) ? chord.abiertas.map(Number) : [];
+  const muted = Array.isArray(chord.apagadas) ? chord.apagadas.map(Number) : [];
   document.querySelectorAll(".open-string-check").forEach(x => x.checked = open.includes(Number(x.value)));
-
+  document.querySelectorAll(".muted-string-check").forEach(x => x.checked = muted.includes(Number(x.value)));
+  adminFretCount=Math.max(8,...currentFingering.map(x=>x.traste+1),...currentBarres.map(x=>x.traste+1));
+  $("#fretCount").value=adminFretCount; populateBarreFrets();
   renderAdminNeck();
   renderBarreList();
 }
@@ -197,7 +205,7 @@ document.querySelectorAll(".mode-select").forEach(btn => {
 });
 
 function xForOrder(order) { return ((Number(order)-1)/4)*100; }
-function yForFret(fret) { return ((Number(fret)-.5)/5)*100; }
+function yForFret(fret) { return ((Number(fret)-.5)/adminFretCount)*100; }
 
 function renderAdminNeck() {
   const host = $("#adminNeck");
@@ -210,10 +218,10 @@ function renderAdminNeck() {
   nut.className = "fretboard-nut";
   neck.append(nut);
 
-  for (let fret=1; fret<=5; fret++) {
+  for (let fret=1; fret<=adminFretCount; fret++) {
     const line=document.createElement("span");
     line.className="fret-line";
-    line.style.top=`${(fret/5)*100}%`;
+    line.style.top=`${(fret/adminFretCount)*100}%`;
     neck.append(line);
   }
 
@@ -245,12 +253,13 @@ function renderAdminNeck() {
   });
 
   for (let order=1; order<=5; order++) {
-    for (let fret=1; fret<=5; fret++) {
+    for (let fret=1; fret<=adminFretCount; fret++) {
       const hit=document.createElement("button");
       hit.type="button";
       hit.className="admin-hit";
       hit.style.left=`${xForOrder(order)}%`;
-      hit.style.top=`${((fret-1)/5)*100}%`;
+      hit.style.top=`${((fret-1)/adminFretCount)*100}%`;
+      hit.style.height=`${100/adminFretCount}%`;
       const found=currentFingering.find(x=>x.orden===order && x.traste===fret);
       if(found){
         hit.classList.add("is-selected");
@@ -334,6 +343,7 @@ $("#saveChordBtn").addEventListener("click", async () => {
     digitacion: currentFingering,
     cejillas: currentBarres,
     abiertas: [...document.querySelectorAll(".open-string-check:checked")].map(x => Number(x.value)),
+    apagadas: [...document.querySelectorAll(".muted-string-check:checked")].map(x => Number(x.value)),
     publicado: $("#chordPublished").checked,
     updated_at: new Date().toISOString()
   };
@@ -365,6 +375,12 @@ $("#deleteChordBtn").addEventListener("click", async () => {
     await loadChordCatalog();
   }
 });
+
+function populateBarreFrets(){ const sel=$("#barreFret"); if(!sel)return; const old=sel.value; sel.replaceChildren(); for(let i=1;i<=adminFretCount;i++){const o=document.createElement("option");o.value=i;o.textContent=i;sel.append(o);} if(old && Number(old)<=adminFretCount)sel.value=old; }
+$("#fretCount")?.addEventListener("change",()=>{adminFretCount=Math.max(5,Math.min(15,Number($("#fretCount").value)||8)); $("#fretCount").value=adminFretCount; populateBarreFrets(); renderAdminNeck();});
+document.querySelectorAll("[data-strum]").forEach(btn=>btn.addEventListener("click",()=>{const input=$("#songStrum"); input.value=(input.value+" "+btn.dataset.strum).trim(); input.focus();}));
+document.querySelectorAll(".open-string-check").forEach(c=>c.addEventListener("change",()=>{if(c.checked){const other=document.querySelector(`.muted-string-check[value="${c.value}"]`);if(other)other.checked=false;}}));
+document.querySelectorAll(".muted-string-check").forEach(c=>c.addEventListener("change",()=>{if(c.checked){const other=document.querySelector(`.open-string-check[value="${c.value}"]`);if(other)other.checked=false;}}));
 
 async function initAdmin() {
   await loadSongs();
