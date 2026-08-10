@@ -20,6 +20,292 @@ $$('#strumOptions button').forEach(btn=>btn.addEventListener('click',()=>{$$('#s
 $("#playChordBtn").addEventListener("click",()=>synthChord(state.selectedChord));$("#earPlayBtn").addEventListener("click",()=>synthChord(state.selectedChord));
 function qIndex(){return QUALITIES.findIndex(s=>state.root+s===state.selectedChord)}$("#prevChordBtn").addEventListener("click",()=>{let i=qIndex();if(i<0)i=0;i=(i-1+QUALITIES.length)%QUALITIES.length;selectChord(state.root+QUALITIES[i]);synthChord(state.selectedChord)});$("#nextChordBtn").addEventListener("click",()=>{let i=qIndex();if(i<0)i=0;i=(i+1)%QUALITIES.length;selectChord(state.root+QUALITIES[i]);synthChord(state.selectedChord)});
 $("#keySelect").addEventListener("change",e=>{state.key=e.target.value;markDirty()});$("#statusSelect").addEventListener("change",e=>{state.status=e.target.value;markDirty()});
-$("#saveBtn").addEventListener("click",()=>{state.notes[state.section]=$("#sectionNotes").value;const payload={song:$("#songSelect").value,key:state.key,status:state.status,strum:state.strum,strumNotes:state.strumNotes,sequences:state.sequences,notes:state.notes};try{localStorage.setItem("charango_current_record",JSON.stringify(payload));$("#saveStatus").textContent="Guardado en este navegador"}catch{$("#saveStatus").textContent="No se pudo guardar localmente"}});
-async function loadSongs(){const select=$("#songSelect");let list=[];try{if(window.CancioneroDB?.listSongs)list=await window.CancioneroDB.listSongs()}catch{}if(!list.length)list=[{numero:"01",titulo:"Himno"},{numero:"02",titulo:"Por los Caminos"},{numero:"03",titulo:"Fiesta de mi Cautivo"}];select.replaceChildren();list.forEach(song=>{const o=document.createElement("option");o.value=song.id||song.numero||song.titulo;o.textContent=`${song.numero?song.numero+" · ":""}${song.titulo}`;select.append(o)})}
-renderRootButtons();renderQualityButtons();renderSequence();renderUsedChords();renderChordDetail();loadSongs();
+
+function youtubeInfo(song){
+  const raw = String(song?.youtube || "").trim();
+  if(!raw) return null;
+
+  let urlString = raw;
+  if(!/^https?:\/\//i.test(urlString)){
+    urlString = `https://www.youtube.com/watch?v=${encodeURIComponent(urlString)}`;
+  }
+
+  try{
+    const u = new URL(urlString);
+    let videoId = "";
+
+    if(u.hostname.includes("youtu.be")){
+      videoId = u.pathname.split("/").filter(Boolean)[0] || "";
+    }else if(u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/")){
+      videoId = u.pathname.split("/")[2] || "";
+    }else{
+      videoId = u.searchParams.get("v") || "";
+    }
+
+    if(!videoId) return { external:urlString, embed:"" };
+
+    const start = Math.max(0, Number(song.inicio) || 0);
+    const params = new URLSearchParams({
+      rel:"0",
+      modestbranding:"1",
+      playsinline:"1"
+    });
+    if(start) params.set("start", String(start));
+    if(location.protocol === "http:" || location.protocol === "https:"){
+      params.set("origin", location.origin);
+    }
+
+    const external = new URL(urlString);
+    external.searchParams.delete("t");
+    external.searchParams.delete("start");
+    if(start) external.searchParams.set("t", `${start}s`);
+
+    return {
+      external: external.toString(),
+      embed: `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`,
+      start
+    };
+  }catch{
+    return null;
+  }
+}
+
+function formatTime(seconds){
+  const total = Math.max(0, Number(seconds) || 0);
+  const m = Math.floor(total / 60);
+  const s = String(total % 60).padStart(2,"0");
+  return `${m}:${s}`;
+}
+
+let songList = [];
+let currentSong = null;
+
+function updateReference(song){
+  currentSong = song || null;
+
+  const title = $("#referenceTitle");
+  const meta = $("#referenceMeta");
+  const startEl = $("#referenceStart");
+  const playBtn = $("#referencePlayBtn");
+  const youtubeBtn = $("#referenceYoutubeBtn");
+  const wrap = $("#referencePlayerWrap");
+  const iframe = $("#referencePlayer");
+
+  if(!song){
+    title.textContent = "Selecciona una canción";
+    meta.textContent = "El enlace y el segundo de inicio vienen directamente del cancionero.";
+    startEl.textContent = "Inicio: 0:00";
+    playBtn.disabled = true;
+    youtubeBtn.hidden = true;
+    wrap.hidden = true;
+    iframe.removeAttribute("src");
+    return;
+  }
+
+  title.textContent = `${song.numero ? song.numero + " · " : ""}${song.titulo}`;
+  meta.textContent = song.categoria
+    ? `${song.categoria} · datos compartidos con el cancionero`
+    : "Datos compartidos con el cancionero";
+
+  const info = youtubeInfo(song);
+  startEl.textContent = `Inicio: ${formatTime(song.inicio)}`;
+
+  if(!info){
+    playBtn.disabled = true;
+    youtubeBtn.hidden = true;
+    wrap.hidden = true;
+    iframe.removeAttribute("src");
+    return;
+  }
+
+  playBtn.disabled = !info.embed;
+  youtubeBtn.hidden = false;
+  youtubeBtn.href = info.external;
+
+  playBtn.dataset.embed = info.embed || "";
+}
+
+function toggleReference(){
+  const wrap = $("#referencePlayerWrap");
+  const iframe = $("#referencePlayer");
+  const btn = $("#referencePlayBtn");
+  const embed = btn.dataset.embed || "";
+
+  if(!embed) return;
+
+  if(!wrap.hidden){
+    wrap.hidden = true;
+    iframe.removeAttribute("src");
+    btn.textContent = "▶ Escuchar referencia";
+    return;
+  }
+
+  iframe.src = embed;
+  wrap.hidden = false;
+  btn.textContent = "■ Ocultar referencia";
+}
+
+$("#referencePlayBtn").addEventListener("click", toggleReference);
+
+function recordKey(songId){
+  return `charango_record_${songId || "sin-id"}`;
+}
+
+function saveCurrentRecord(){
+  state.notes[state.section] = $("#sectionNotes").value;
+
+  const songId = $("#songSelect").value;
+  const payload = {
+    songId,
+    key: state.key,
+    status: state.status,
+    strum: state.strum,
+    strumNotes: state.strumNotes,
+    sequences: state.sequences,
+    notes: state.notes
+  };
+
+  try{
+    localStorage.setItem(recordKey(songId), JSON.stringify(payload));
+    $("#saveStatus").textContent = "Guardado para esta canción";
+  }catch{
+    $("#saveStatus").textContent = "No se pudo guardar localmente";
+  }
+}
+
+function resetMusicalState(){
+  state.section = "intro";
+  state.sequences = {intro:[],verso:[],coro:[],puente:[]};
+  state.notes = {intro:"",verso:"",coro:"",puente:""};
+  state.strum = "↓ ↓↑ ↑↓↑";
+  state.strumNotes = "";
+  state.status = "En aprendizaje";
+  state.key = "G";
+
+  $("#keySelect").value = "G";
+  $("#statusSelect").value = "En aprendizaje";
+  $("#sectionNotes").value = "";
+  $("#strumNotes").value = "";
+
+  document.querySelectorAll("#sectionTabs button").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.section === "intro");
+  });
+  document.querySelectorAll("#strumOptions button").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.pattern === state.strum);
+  });
+
+  renderSequence();
+  renderUsedChords();
+}
+
+function loadRecordForSong(songId){
+  resetMusicalState();
+
+  try{
+    const raw = localStorage.getItem(recordKey(songId));
+    if(!raw){
+      $("#saveStatus").textContent = "Sin registro de charango todavía";
+      return;
+    }
+
+    const data = JSON.parse(raw);
+
+    state.key = data.key || "G";
+    state.status = data.status || "En aprendizaje";
+    state.strum = data.strum || "↓ ↓↑ ↑↓↑";
+    state.strumNotes = data.strumNotes || "";
+    state.sequences = {
+      intro:[...(data.sequences?.intro || [])],
+      verso:[...(data.sequences?.verso || [])],
+      coro:[...(data.sequences?.coro || [])],
+      puente:[...(data.sequences?.puente || [])]
+    };
+    state.notes = {
+      intro:data.notes?.intro || "",
+      verso:data.notes?.verso || "",
+      coro:data.notes?.coro || "",
+      puente:data.notes?.puente || ""
+    };
+
+    $("#keySelect").value = state.key;
+    $("#statusSelect").value = state.status;
+    $("#strumNotes").value = state.strumNotes;
+    $("#sectionNotes").value = state.notes.intro;
+
+    document.querySelectorAll("#strumOptions button").forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.pattern === state.strum);
+    });
+
+    renderSequence();
+    renderUsedChords();
+    $("#saveStatus").textContent = "Registro cargado";
+  }catch{
+    $("#saveStatus").textContent = "No se pudo leer el registro guardado";
+  }
+}
+
+$("#saveBtn").addEventListener("click", saveCurrentRecord);
+
+async function loadSongs(){
+  const select = $("#songSelect");
+  select.replaceChildren();
+
+  try{
+    if(window.CancioneroDB?.listSongs){
+      songList = await window.CancioneroDB.listSongs();
+    }
+  }catch(error){
+    console.error("No se pudieron cargar canciones desde Supabase:", error);
+  }
+
+  if(!songList.length){
+    songList = (window.CANCIONES_INICIALES || []).map((song,index)=>({
+      ...song,
+      id:song.id || song.numero || String(index+1)
+    }));
+  }
+
+  songList.forEach(song=>{
+    const option = document.createElement("option");
+    option.value = song.id || song.numero || song.titulo;
+    option.textContent = `${song.numero ? song.numero+" · " : ""}${song.titulo}`;
+    select.append(option);
+  });
+
+  if(!songList.length){
+    const option = document.createElement("option");
+    option.textContent = "No hay canciones disponibles";
+    option.value = "";
+    select.append(option);
+    updateReference(null);
+    return;
+  }
+
+  const querySong = new URLSearchParams(location.search).get("song");
+  const requested = querySong
+    ? songList.find(song => String(song.id || song.numero) === querySong || String(song.numero) === querySong)
+    : null;
+
+  const first = requested || songList[0];
+  select.value = first.id || first.numero || first.titulo;
+
+  updateReference(first);
+  loadRecordForSong(select.value);
+}
+
+$("#songSelect").addEventListener("change", ()=>{
+  const selected = songList.find(song => String(song.id || song.numero || song.titulo) === $("#songSelect").value);
+  updateReference(selected);
+  loadRecordForSong($("#songSelect").value);
+
+  const url = new URL(location.href);
+  if(selected) url.searchParams.set("song", selected.id || selected.numero);
+  history.replaceState(null,"",url);
+});
+
+renderRootButtons();
+renderQualityButtons();
+renderSequence();
+renderUsedChords();
+renderChordDetail();
+loadSongs();

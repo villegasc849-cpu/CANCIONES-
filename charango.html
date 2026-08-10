@@ -24,6 +24,30 @@
       </div>
     </header>
 
+    <section class="reference-panel">
+      <div class="reference-copy">
+        <p class="eyebrow">Referencia de la canción</p>
+        <h2 id="referenceTitle">Selecciona una canción</h2>
+        <p id="referenceMeta">El enlace y el segundo de inicio vienen directamente del cancionero.</p>
+      </div>
+
+      <div class="reference-actions">
+        <button id="referencePlayBtn" class="primary" type="button" disabled>▶ Escuchar referencia</button>
+        <a id="referenceYoutubeBtn" class="ghost reference-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir en YouTube ↗</a>
+        <span id="referenceStart" class="soft-badge">Inicio: 0:00</span>
+      </div>
+
+      <div id="referencePlayerWrap" class="reference-player" hidden>
+        <iframe
+          id="referencePlayer"
+          title="Referencia de YouTube"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </section>
+
     <section class="grid-main">
       <article class="panel chord-picker">
         <div class="panel-head"><div><span class="step">1</span><h2>Acordes disponibles</h2></div><p>Elige la nota raíz y luego la variante.</p></div>
@@ -64,6 +88,10 @@
 
     <footer class="statusbar"><span id="saveStatus">Cambios sin guardar</span><span>Primera versión funcional · Charango</span></footer>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="canciones.js"></script>
+  <script src="data-service.js"></script>
   <script src="charango.js"></script>
 </body>
 </html>
