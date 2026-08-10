@@ -27,11 +27,6 @@
   >
 
   <style>
-    /* =====================================================
-       ACCESOS MUSICALES
-       Se añade aquí para NO modificar style.css.
-       ===================================================== */
-
     .music-access {
       width: min(920px, calc(100% - 32px));
       margin: 0 auto 28px;
@@ -85,9 +80,7 @@
 
     .music-access__button:hover {
       transform: translateY(-2px);
-
       border-color: rgba(79, 57, 104, 0.45);
-
       background: #fffdf8;
 
       box-shadow:
@@ -98,10 +91,24 @@
       font-size: 1.2rem;
     }
 
-    @media (max-width: 600px) {
+    .toolbar__actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 700px) {
 
       .music-access__buttons {
         grid-template-columns: 1fr;
+      }
+
+      .toolbar__actions {
+        width: 100%;
+      }
+
+      .toolbar__actions button {
+        flex: 1;
       }
 
     }
@@ -206,7 +213,7 @@
 
 
   <!-- =====================================================
-       ACCESOS A INSTRUMENTOS
+       ACCESOS MUSICALES
        ===================================================== -->
 
   <nav
@@ -276,9 +283,9 @@
     >
 
 
-      <!-- =========================
+      <!-- =================================================
            BARRA DE HERRAMIENTAS
-           ========================= -->
+           ================================================= -->
 
       <div class="toolbar">
 
@@ -336,23 +343,36 @@
 
 
 
-        <!-- CERRAR TODAS -->
+        <!-- BOTONES -->
 
-        <button
-          id="cerrar-todo"
-          class="close-all"
-          type="button"
-        >
-          Cerrar todo
-        </button>
+        <div class="toolbar__actions">
+
+          <button
+            id="cerrar-todo"
+            class="close-all"
+            type="button"
+          >
+            Cerrar todo
+          </button>
+
+
+          <button
+            id="generar-pdf"
+            class="close-all"
+            type="button"
+          >
+            Generar libro PDF
+          </button>
+
+        </div>
 
       </div>
 
 
 
-      <!-- =========================
+      <!-- =================================================
            ESTADO DE CARGA
-           ========================= -->
+           ================================================= -->
 
       <p
         id="estado-carga"
@@ -364,9 +384,9 @@
 
 
 
-      <!-- =========================
+      <!-- =================================================
            CONTADOR
-           ========================= -->
+           ================================================= -->
 
       <p
         id="contador"
@@ -376,9 +396,9 @@
 
 
 
-      <!-- =========================
+      <!-- =================================================
            LISTA DE CANCIONES
-           ========================= -->
+           ================================================= -->
 
       <div
         id="lista-canciones"
@@ -388,9 +408,9 @@
 
 
 
-      <!-- =========================
+      <!-- =================================================
            SIN RESULTADOS
-           ========================= -->
+           ================================================= -->
 
       <div
         id="sin-resultados"
@@ -412,8 +432,8 @@
 
 
         <p>
-          Prueba con otro número, título
-          o palabra de la letra.
+          Prueba con otro número,
+          título o palabra de la letra.
         </p>
 
       </div>
@@ -448,16 +468,36 @@
 
 
   <!-- =====================================================
-       SCRIPTS
+       LIBRERÍAS Y SCRIPTS
+       ORDEN IMPORTANTE
        ===================================================== -->
 
-  <script src="canciones.js"></script>
+  <!-- Supabase -->
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+  ></script>
+
+
+  <!-- Configuración del proyecto -->
 
   <script src="config.js"></script>
 
+
+  <!-- Canciones de respaldo -->
+
+  <script src="canciones.js"></script>
+
+
+  <!-- Conexión con Supabase -->
+
   <script src="data-service.js"></script>
 
+
+  <!-- Funcionamiento principal -->
+
   <script src="script.js"></script>
+
 
 </body>
 
