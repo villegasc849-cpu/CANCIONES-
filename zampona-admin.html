@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Administración Zampoña · Señor Cautivo</title>
+  <link rel="stylesheet" href="musica.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-cross">✝</div>
+      <strong>Señor Cautivo</strong>
+      <span>Administración musical</span>
+    </div>
+
+    <nav class="side-nav">
+      <a href="index.html">♫ Cancionero</a>
+      <a href="zampona.html">▥ Zampoña pública</a>
+      <a class="active" href="zampona-admin.html">⚙ Editar Zampoña</a>
+    </nav>
+
+    <div class="sidebar-foot">Acceso privado</div>
+  </aside>
+
+  <main class="app">
+    <section id="loginView" class="music-login">
+      <div class="panel music-login-card">
+        <p class="eyebrow">Administración privada</p>
+        <h1>Zampoña</h1>
+        <p>Inicia sesión con el mismo usuario administrador del cancionero.</p>
+
+        <form id="loginForm" class="admin-music-form">
+          <label>
+            <span>Correo</span>
+            <input id="loginEmail" type="email" required autocomplete="username">
+          </label>
+          <label>
+            <span>Contraseña</span>
+            <input id="loginPassword" type="password" required autocomplete="current-password">
+          </label>
+          <button class="primary wide" type="submit">Iniciar sesión</button>
+          <p id="loginStatus" class="status-message"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="adminView" hidden>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Administración privada</p>
+          <h1>Editor de Zampoña</h1>
+        </div>
+        <div class="top-controls">
+          <span id="adminUser" class="soft-badge"></span>
+          <button id="logoutBtn" class="ghost" type="button">Cerrar sesión</button>
+        </div>
+      </header>
+
+      <section class="zampona-admin-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div><span class="step">1</span><h2>Ficha de la canción</h2></div>
+          </div>
+
+          <div class="admin-fields">
+            <label>
+              <span>Canción</span>
+              <select id="songSelect"></select>
+            </label>
+
+            <label>
+              <span>Tonalidad / escala</span>
+              <input id="songScale" type="text" placeholder="Ej.: Sol mayor">
+            </label>
+
+            <label>
+              <span>Tempo (BPM)</span>
+              <input id="songTempo" type="number" min="1" max="300" placeholder="90">
+            </label>
+
+            <label class="publish-row">
+              <input id="songPublished" type="checkbox">
+              <span>Publicar esta ficha para todos</span>
+            </label>
+          </div>
+
+          <div class="admin-section-editor">
+            <h3>Secuencias por partes</h3>
+            <p class="admin-help">Escribe los números/etiquetas de los tubos separados por espacios. Ej.: 5 5 1 23 3 2</p>
+
+            <label><span>Intro</span><input id="secIntro" type="text"></label>
+            <label><span>Verso</span><input id="secVerso" type="text"></label>
+            <label><span>Coro</span><input id="secCoro" type="text"></label>
+            <label><span>Puente</span><input id="secPuente" type="text"></label>
+            <label><span>Final</span><input id="secFinal" type="text"></label>
+          </div>
+
+          <button id="saveSongRecord" class="primary wide" type="button">Guardar ficha de canción</button>
+          <p id="songSaveStatus" class="status-message"></p>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><span class="step">2</span><h2>Configurar zampoña 12×11</h2></div>
+          </div>
+
+          <div class="zampona-config-layout">
+            <div>
+              <div id="tubeList" class="zampona-tube-list"></div>
+            </div>
+
+            <div class="zampona-editor">
+              <p class="admin-help">Selecciona un tubo del dibujo o de la lista y define su número, nota y frecuencia. No se asignó ninguna nota automáticamente.</p>
+
+              <div id="adminMap" class="zampona-map-admin">
+                <div id="adminUpperRow" class="zampona-admin-row"></div>
+                <div id="adminLowerRow" class="zampona-admin-row"></div>
+              </div>
+
+              <input id="tubeId" type="hidden">
+
+              <div class="zampona-fields">
+                <label>
+                  <span>Fila</span>
+                  <select id="tubeRow">
+                    <option value="superior">Superior (12 tubos)</option>
+                    <option value="inferior">Inferior (11 tubos)</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Posición</span>
+                  <input id="tubePosition" type="number" min="1" max="12">
+                </label>
+
+                <label>
+                  <span>Número / código</span>
+                  <input id="tubeNumber" type="text" placeholder="Ej.: 5 o 23">
+                </label>
+
+                <label>
+                  <span>Etiqueta visible</span>
+                  <input id="tubeLabel" type="text" placeholder="Ej.: 5">
+                </label>
+
+                <label>
+                  <span>Nota musical</span>
+                  <input id="tubeNote" type="text" placeholder="Ej.: G4 / Sol">
+                </label>
+
+                <label>
+                  <span>Frecuencia (Hz)</span>
+                  <input id="tubeFrequency" type="number" min="1" step="0.01" placeholder="440.00">
+                </label>
+              </div>
+
+              <label class="publish-row">
+                <input id="tubePublished" type="checkbox">
+                <span>Mostrar este tubo al público</span>
+              </label>
+
+              <div class="form-actions">
+                <button id="playTubeBtn" class="ghost" type="button">▶ Probar sonido</button>
+                <button id="saveTubeBtn" class="primary" type="button">Guardar tubo</button>
+              </div>
+
+              <p id="tubeSaveStatus" class="status-message"></p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="canciones.js"></script>
+  <script src="data-service.js"></script>
+  <script src="zampona-admin.js"></script>
+</body>
+</html>

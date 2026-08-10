@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zampoña · Cancionero Señor Cautivo</title>
+  <link rel="stylesheet" href="musica.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-cross">✝</div>
+      <strong>Señor Cautivo</strong>
+      <span>Cancionero musical</span>
+    </div>
+
+    <nav class="side-nav">
+      <a href="index.html">♫ Cancionero</a>
+      <a href="charango.html">🪕 Charango</a>
+      <a class="active" href="zampona.html">▥ Zampoña</a>
+      <a href="admin.html">⚙ Administración</a>
+    </nav>
+
+    <div class="sidebar-foot">Vista pública</div>
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Guía musical pública</p>
+        <h1>Zampoña · Secuencias por canción</h1>
+      </div>
+
+      <div class="top-controls">
+        <label>
+          <span>Canción</span>
+          <select id="songSelect"></select>
+        </label>
+        <a class="ghost reference-link" href="zampona-admin.html">Administrar Zampoña</a>
+      </div>
+    </header>
+
+    <section class="reference-panel">
+      <div class="reference-copy">
+        <p class="eyebrow">Canción seleccionada</p>
+        <h2 id="songTitle">Cargando…</h2>
+        <p id="songMeta">Los datos provienen del mismo cancionero.</p>
+      </div>
+
+      <div class="reference-actions">
+        <button id="referencePlayBtn" class="primary" type="button" disabled>▶ Escuchar referencia</button>
+        <a id="youtubeBtn" class="ghost reference-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir en YouTube ↗</a>
+        <span id="referenceStart" class="soft-badge">Inicio: 0:00</span>
+      </div>
+
+      <div id="referencePlayerWrap" class="reference-player" hidden>
+        <iframe id="referencePlayer" title="Referencia de YouTube" loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen></iframe>
+      </div>
+    </section>
+
+    <section id="notPublished" class="public-empty" hidden>
+      <div class="public-empty__symbol">▥</div>
+      <h2>Esta canción todavía no tiene secuencia de Zampoña publicada</h2>
+      <p>Cuando el administrador complete y publique la ficha, aparecerá aquí.</p>
+    </section>
+
+    <section id="publicContent" class="zampona-public" hidden>
+      <article class="panel zampona-summary">
+        <div class="summary-item">
+          <span>Tonalidad / escala</span>
+          <strong id="publicScale">—</strong>
+        </div>
+        <div class="summary-item">
+          <span>Tempo</span>
+          <strong id="publicTempo">—</strong>
+        </div>
+        <div class="summary-item">
+          <span>Tubos configurados</span>
+          <strong id="publicTubeCount">0 / 23</strong>
+        </div>
+      </article>
+
+      <article class="panel zampona-sections-panel">
+        <div class="panel-head">
+          <div><span class="step">1</span><h2>Secuencia de la canción</h2></div>
+          <p>Selecciona un número para escucharlo y ubicar su tubo.</p>
+        </div>
+        <div id="publicSections" class="public-sections"></div>
+      </article>
+
+      <article class="panel zampona-instrument-panel">
+        <div class="panel-head">
+          <div><span class="step">2</span><h2>Zampoña interactiva · 12×11</h2></div>
+          <p>Cada tubo usa la configuración publicada por el administrador.</p>
+        </div>
+
+        <div class="zampona-shell">
+          <div class="zampona-rows">
+            <div id="upperRow" class="zampona-row"></div>
+            <div id="lowerRow" class="zampona-row zampona-row--lower"></div>
+          </div>
+        </div>
+
+        <p class="hint">Haz clic en cualquier tubo para escucharlo. El tubo activo se marca en morado.</p>
+      </article>
+    </section>
+
+    <footer class="statusbar">
+      <span id="publicStatus">Cargando ficha…</span>
+      <span>Vista pública · solo lectura</span>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="canciones.js"></script>
+  <script src="data-service.js"></script>
+  <script src="zampona.js"></script>
+</body>
+</html>
