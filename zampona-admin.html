@@ -146,13 +146,47 @@
 
                 <label>
                   <span>Nota musical</span>
-                  <input id="tubeNote" type="text" placeholder="Ej.: G4 / Sol">
+                  <select id="tubePitch">
+                    <option value="">Seleccionar…</option>
+                    <option value="C">Do (C)</option>
+                    <option value="C#">Do# (C#)</option>
+                    <option value="D">Re (D)</option>
+                    <option value="D#">Re# / Mib</option>
+                    <option value="E">Mi (E)</option>
+                    <option value="F">Fa (F)</option>
+                    <option value="F#">Fa# (F#)</option>
+                    <option value="G">Sol (G)</option>
+                    <option value="G#">Sol# / Lab</option>
+                    <option value="A">La (A)</option>
+                    <option value="A#">La# / Sib</option>
+                    <option value="B">Si (B)</option>
+                  </select>
                 </label>
 
                 <label>
-                  <span>Frecuencia (Hz)</span>
-                  <input id="tubeFrequency" type="number" min="1" step="0.01" placeholder="440.00">
+                  <span>Octava</span>
+                  <select id="tubeOctave">
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
                 </label>
+              </div>
+
+              <div class="frequency-box">
+                <span class="admin-help">Frecuencia calculada</span>
+                <strong id="autoFrequency">— Hz</strong>
+                <small>Se calcula automáticamente a partir de nota + octava usando afinación A4 = 440 Hz.</small>
+
+                <div class="custom-frequency-row">
+                  <label class="publish-row">
+                    <input id="useCustomFrequency" type="checkbox">
+                    <span>Usar frecuencia personalizada</span>
+                  </label>
+                  <input id="customFrequency" class="custom-frequency-input" type="number" min="1" step="0.01" placeholder="Ej.: 391.25" disabled>
+                </div>
               </div>
 
               <label class="publish-row">

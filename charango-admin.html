@@ -134,7 +134,13 @@
               </label>
 
               <h3>Digitación</h3>
-              <p class="admin-help">Haz clic en una casilla del mástil y luego elige el dedo 1–4. Haz clic otra vez para quitarlo.</p>
+              <p class="admin-help">Cada línea vertical representa uno de los 5 órdenes del charango. Los puntos quedan sobre la cuerda. Para acordes con cejilla usa el modo “Cejilla”.</p>
+
+              <div class="mode-picker">
+                <span>Modo:</span>
+                <button class="mode-select active" data-mode="dedo" type="button">● Dedo individual</button>
+                <button class="mode-select" data-mode="cejilla" type="button">━ Cejilla</button>
+              </div>
 
               <div class="finger-picker">
                 <span>Dedo:</span>
@@ -144,12 +150,23 @@
                 <button class="finger-select" data-finger="4" type="button">4</button>
               </div>
 
-              <div class="admin-fretboard-wrap">
-                <div id="adminFretboard" class="admin-fretboard"></div>
+              <div id="fingerEditorWrap">
+                <div id="adminNeck" class="admin-neck"></div>
+              </div>
+
+              <div id="barreEditor" hidden>
+                <div class="barre-builder">
+                  <label><span>Traste</span><select id="barreFret"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+                  <label><span>Desde orden</span><select id="barreFrom"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+                  <label><span>Hasta orden</span><select id="barreTo"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
+                  <label><span>Dedo</span><select id="barreFinger"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+                </div>
+                <button id="addBarreBtn" class="ghost" type="button">+ Agregar cejilla</button>
+                <div id="barreList" class="barre-list"></div>
               </div>
 
               <div class="open-strings-admin">
-                <span>Cuerdas/órdenes al aire:</span>
+                <span>Órdenes al aire:</span>
                 <label><input class="open-string-check" value="1" type="checkbox">1</label>
                 <label><input class="open-string-check" value="2" type="checkbox">2</label>
                 <label><input class="open-string-check" value="3" type="checkbox">3</label>

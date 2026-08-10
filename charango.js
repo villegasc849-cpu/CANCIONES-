@@ -14,16 +14,13 @@ function formatTime(seconds) {
 function youtubeInfo(song) {
   const raw = String(song?.youtube || "").trim();
   if (!raw) return null;
-
   let urlString = raw;
   if (!/^https?:\/\//i.test(urlString)) {
     urlString = `https://www.youtube.com/watch?v=${encodeURIComponent(urlString)}`;
   }
-
   try {
     const u = new URL(urlString);
     let id = "";
-
     if (u.hostname.includes("youtu.be")) id = u.pathname.split("/").filter(Boolean)[0] || "";
     else if (u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/")) id = u.pathname.split("/")[2] || "";
     else id = u.searchParams.get("v") || "";
@@ -71,7 +68,6 @@ function updateReference(song) {
     btn.dataset.embed = "";
     return;
   }
-
   btn.disabled = !info.embed;
   btn.dataset.embed = info.embed || "";
   yt.hidden = false;
@@ -115,7 +111,6 @@ function renderSections(record) {
     section.className = "public-section";
     const h3 = document.createElement("h3");
     h3.textContent = label;
-
     const row = document.createElement("div");
     row.className = "sequence public-sequence";
 
@@ -127,7 +122,6 @@ function renderSections(record) {
       btn.addEventListener("click", () => selectChord(name));
       row.append(btn);
     });
-
     section.append(h3, row);
     container.append(section);
   });
@@ -151,59 +145,111 @@ function renderUsedChords(record) {
   if (used.length) selectChord(used[0]);
 }
 
+function xForOrder(order) {
+  return ((Number(order) - 1) / 4) * 100;
+}
+function yForFret(fret) {
+  return ((Number(fret) - 0.5) / 5) * 100;
+}
+
+function buildNeckBase(board) {
+  const neck = document.createElement("div");
+  neck.className = "fretboard-neck";
+
+  const nut = document.createElement("span");
+  nut.className = "fretboard-nut";
+  neck.append(nut);
+
+  for (let fret = 1; fret <= 5; fret++) {
+    const line = document.createElement("span");
+    line.className = "fret-line";
+    line.style.top = `${(fret / 5) * 100}%`;
+    neck.append(line);
+  }
+
+  for (let order = 1; order <= 5; order++) {
+    const line = document.createElement("span");
+    line.className = "string-line";
+    line.style.left = `${xForOrder(order)}%`;
+    neck.append(line);
+  }
+
+  board.append(neck);
+  return neck;
+}
+
 function renderFretboard(data) {
   const board = $("#fretboard");
   board.replaceChildren();
-
-  for (let s = 1; s <= 5; s++) {
-    const label = document.createElement("span");
-    label.className = "string-label";
-    label.textContent = `${s}ª`;
-    label.style.top = `${(s - .5) * 20}%`;
-    board.append(label);
-  }
+  const neck = buildNeckBase(board);
 
   if (!data) return;
 
-  const open = Array.isArray(data.abiertas) ? data.abiertas : [];
-  open.forEach(string => {
-    const dot = document.createElement("span");
-    dot.className = "open-string";
-    dot.style.left = "5%";
-    dot.style.top = `${(Number(string) - .5) * 20}%`;
-    board.append(dot);
+  const open = new Set((Array.isArray(data.abiertas) ? data.abiertas : []).map(Number));
+  const muted = new Set((Array.isArray(data.apagadas) ? data.apagadas : []).map(Number));
+
+  for (let order = 1; order <= 5; order++) {
+    if (open.has(order)) {
+      const marker = document.createElement("span");
+      marker.className = "open-marker";
+      marker.style.left = `${xForOrder(order)}%`;
+      neck.append(marker);
+    } else if (muted.has(order)) {
+      const marker = document.createElement("span");
+      marker.className = "muted-marker";
+      marker.textContent = "×";
+      marker.style.left = `${xForOrder(order)}%`;
+      neck.append(marker);
+    }
+  }
+
+  const barres = Array.isArray(data.cejillas) ? data.cejillas : [];
+  barres.forEach(b => {
+    const from = Math.max(1, Math.min(5, Number(b.desde)));
+    const to = Math.max(1, Math.min(5, Number(b.hasta)));
+    const min = Math.min(from, to);
+    const max = Math.max(from, to);
+
+    const bar = document.createElement("span");
+    bar.className = "barre";
+    bar.style.top = `${yForFret(b.traste)}%`;
+    bar.style.left = `${xForOrder(min)}%`;
+    bar.style.width = `${xForOrder(max) - xForOrder(min)}%`;
+
+    const n = document.createElement("span");
+    n.className = "barre-number";
+    n.textContent = Number(b.dedo) || 1;
+    bar.append(n);
+    neck.append(bar);
   });
 
   const fingers = Array.isArray(data.digitacion) ? data.digitacion : [];
   fingers.forEach(item => {
-    const string = Number(item.orden);
-    const fret = Number(item.traste);
-    const finger = Number(item.dedo);
-
     const dot = document.createElement("span");
     dot.className = "finger-dot";
-    dot.textContent = finger || "●";
-    dot.style.left = `${((fret - .5) / 6) * 100}%`;
-    dot.style.top = `${(string - .5) * 20}%`;
-    board.append(dot);
+    dot.textContent = Number(item.dedo) || "●";
+    dot.style.left = `${xForOrder(item.orden)}%`;
+    dot.style.top = `${yForFret(item.traste)}%`;
+    neck.append(dot);
   });
 }
 
 function selectChord(name) {
   selectedChord = chordCatalog.find(x => x.nombre === name) || null;
-
   $("#selectedChordLabel").textContent = name || "—";
   $("#selectedChordName").textContent = selectedChord?.nombre_completo || "Digitación no publicada";
   $("#chordTones").textContent = Array.isArray(selectedChord?.notas) && selectedChord.notas.length ? selectedChord.notas.join(" · ") : "—";
   $("#playChordBtn").disabled = !selectedChord?.notas?.length;
-
   renderFretboard(selectedChord);
 }
 
 function frequencyForNote(note) {
   const map = { C:0,"C#":1,Db:1,D:2,"D#":3,Eb:3,E:4,F:5,"F#":6,Gb:6,G:7,"G#":8,Ab:8,A:9,"A#":10,Bb:10,B:11 };
-  const base = String(note).replace(/[0-9]/g,"");
-  const midi = 60 + (map[base] ?? 0);
+  const match = String(note).match(/^([A-G](?:#|b)?)(-?\d+)?$/);
+  if (!match) return null;
+  const pitch = match[1];
+  const octave = match[2] == null ? 4 : Number(match[2]);
+  const midi = (octave + 1) * 12 + (map[pitch] ?? 0);
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
@@ -213,10 +259,12 @@ $("#playChordBtn").addEventListener("click", () => {
   const now = ctx.currentTime;
 
   selectedChord.notas.forEach((note, i) => {
+    const freq = frequencyForNote(note) || frequencyForNote(`${note}4`);
+    if (!freq) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "triangle";
-    osc.frequency.value = frequencyForNote(note);
+    osc.frequency.value = freq;
     gain.gain.setValueAtTime(.0001, now);
     gain.gain.exponentialRampToValueAtTime(.10, now + .02 + i * .02);
     gain.gain.exponentialRampToValueAtTime(.0001, now + 1.15);
@@ -229,14 +277,12 @@ $("#playChordBtn").addEventListener("click", () => {
 async function fetchPublicRecord(songId) {
   const client = window.CancioneroDB?.client;
   if (!client) return null;
-
   const { data, error } = await client
     .from("charango_canciones")
     .select("*")
     .eq("cancion_id", songId)
     .eq("publicado", true)
     .maybeSingle();
-
   if (error) throw error;
   return data;
 }
@@ -244,13 +290,11 @@ async function fetchPublicRecord(songId) {
 async function fetchChordCatalog() {
   const client = window.CancioneroDB?.client;
   if (!client) return [];
-
   const { data, error } = await client
     .from("charango_acordes")
     .select("*")
     .eq("publicado", true)
     .order("nombre");
-
   if (error) throw error;
   return data || [];
 }
@@ -258,7 +302,6 @@ async function fetchChordCatalog() {
 function showRecord(record) {
   currentRecord = record;
   const has = Boolean(record);
-
   $("#notPublished").hidden = has;
   $("#publicContent").hidden = !has;
 
@@ -280,7 +323,6 @@ async function loadSelectedSong() {
   if (!currentSong) return;
 
   updateReference(currentSong);
-
   const url = new URL(location.href);
   url.searchParams.set("song", currentSong.id || currentSong.numero);
   history.replaceState(null, "", url);
@@ -311,9 +353,9 @@ async function init() {
     });
 
     const requested = new URLSearchParams(location.search).get("song");
-    if (requested && songs.some(s => String(s.id) === requested || String(s.numero) === requested)) {
+    if (requested) {
       const match = songs.find(s => String(s.id) === requested || String(s.numero) === requested);
-      select.value = match.id;
+      if (match) select.value = match.id;
     }
 
     select.addEventListener("change", loadSelectedSong);
