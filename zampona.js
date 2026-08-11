@@ -41,6 +41,8 @@ function renderTube(tube, rowClass="") {
   btn.className = `z-pipe ${rowClass}`;
   btn.style.height = `${tubeHeight(tube.posicion, tube.fila)}px`;
   btn.dataset.id = tube.id;
+  btn.dataset.fila = tube.fila;
+  btn.dataset.tubo = String(tubeCode(tube));
 
   btn.innerHTML = `
     <span class="z-pipe-hole"></span>
@@ -409,24 +411,32 @@ function renderStructure(record) {
 
 
 
-function playbackSpeed() {
-  const v = Number(document.querySelector("#playbackSpeed")?.value || 1);
-  return Math.max(0.5, Math.min(3, v || 1));
-}
 
-function scaledDelay(ms) {
-  return ms / playbackSpeed();
-}
+
+
+
+
+
+
+
+async 
+
+
+
+async 
+
+
 
 function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true){
-  document.querySelectorAll(".z-tube").forEach(el=>{
+  document.querySelectorAll(".z-pipe").forEach(el=>{
     const match=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
     if(match) el.classList.toggle("is-playing",on);
   });
+
   document.querySelectorAll(".z-notation-number").forEach(el=>{
-    const match=(eventIndex===null || Number(el.dataset.eventIndex)===Number(eventIndex)) &&
-      el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
-    if(match) el.classList.toggle("is-playing",on);
+    const sameTube=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
+    const sameEvent=eventIndex===null || Number(el.dataset.eventIndex)===Number(eventIndex);
+    if(sameTube && sameEvent) el.classList.toggle("is-playing",on);
   });
 }
 
@@ -434,50 +444,147 @@ function clearPlaybackHighlights(){
   document.querySelectorAll(".is-playing").forEach(el=>el.classList.remove("is-playing"));
 }
 
-async function playTubeGuided(fila,tubo,eventIndex=null,duration=1){
+let playbackRunId = 0;
+let activeAudioContext = null;
+
+function getPlaybackSpeedSnapshot(){
+  const v=Number(document.querySelector("#playbackSpeed")?.value || 1);
+  return Math.max(.5,Math.min(3,v || 1));
+}
+
+function stopPlayback(){
+  playbackRunId++;
+  clearPlaybackHighlights();
+  if(activeAudioContext){
+    try{ activeAudioContext.close(); }catch{}
+    activeAudioContext=null;
+  }
+}
+
+function waitPlayback(ms,runId){
+  return new Promise(resolve=>{
+    setTimeout(()=>resolve(runId===playbackRunId),Math.max(20,ms));
+  });
+}
+
+function synthStable(freq,durationMs,runId){
+  const f=Number(freq);
+  if(!f || runId!==playbackRunId) return;
+
+  if(!activeAudioContext || activeAudioContext.state==="closed"){
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    activeAudioContext=new Ctx();
+  }
+
+  const ctx=activeAudioContext;
+  const now=ctx.currentTime;
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  const filter=ctx.createBiquadFilter();
+
+  osc.type="sine";
+  osc.frequency.value=f;
+  filter.type="lowpass";
+  filter.frequency.value=1500;
+
+  const seconds=Math.max(.07,durationMs/1000);
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(.12,now+.015);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+seconds);
+
+  osc.connect(filter).connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now+seconds+.015);
+}
+
+async function playGuidedNote(fila,tubo,eventIndex,durationUnits,speed,runId){
+  if(runId!==playbackRunId) return false;
+
+  clearPlaybackHighlights();
   setPlaybackHighlight(fila,tubo,eventIndex,true);
-  await playTube(fila,tubo);
-  await new Promise(r=>setTimeout(r,Math.max(70,Math.round(scaledDelay(420*Number(duration||1))))));
+
+  const tube=findTube(fila,tubo);
+  const baseMs=520*Math.max(.25,Number(durationUnits)||1);
+  const ms=Math.max(80,Math.round(baseMs/speed));
+
+  if(tube) synthStable(tube.frecuencia,ms*.9,runId);
+
+  const ok=await waitPlayback(ms,runId);
   setPlaybackHighlight(fila,tubo,eventIndex,false);
+  return ok;
 }
 
-function dragSteps(ev){
-  const a=Number(ev.desde.tubo), b=Number(ev.hasta.tubo);
+function dragTubeNumbers(ev){
+  if(!ev?.desde || !ev?.hasta) return [];
+  if(ev.desde.fila!==ev.hasta.fila) return []; // seguridad absoluta
+  const a=Number(ev.desde.tubo),b=Number(ev.hasta.tubo);
   const step=a<=b?1:-1;
-  const arr=[];
-  for(let n=a; step>0?n<=b:n>=b; n+=step) arr.push(n);
-  return arr;
+  const values=[];
+  for(let n=a;step>0?n<=b:n>=b;n+=step) values.push(n);
+  return values;
 }
 
-async function playEvent(ev,eventIndex=null) {
+async function playEventStable(ev,eventIndex,speed,runId){
+  if(runId!==playbackRunId) return false;
+
   if(ev.tipo==="separador"){
-    await new Promise(r=>setTimeout(r,scaledDelay(300)));
-    return;
+    return await waitPlayback(Math.round(300/speed),runId);
   }
 
   if(ev.tipo==="arrastre"){
-    const steps=dragSteps(ev);
-    const each=Math.max(.18,Number(ev.duracion||1)/Math.max(1,steps.length));
-    for(const tubo of steps){
-      await playTubeGuided(ev.desde.fila,tubo,eventIndex,each);
+    if(ev.desde.fila!==ev.hasta.fila) return true;
+    const nums=dragTubeNumbers(ev);
+    if(!nums.length) return true;
+
+    const totalUnits=Math.max(.5,Number(ev.duracion)||1);
+    const eachUnits=totalUnits/nums.length;
+
+    for(const tubo of nums){
+      const ok=await playGuidedNote(ev.desde.fila,tubo,eventIndex,eachUnits,speed,runId);
+      if(!ok) return false;
     }
-    return;
+    return true;
   }
 
-  await playTubeGuided(ev.fila,ev.tubo,eventIndex,ev.duracion||1);
+  return await playGuidedNote(ev.fila,ev.tubo,eventIndex,ev.duracion||1,speed,runId);
 }
 
-async function playAll() {
-  if(!currentRecord) return;
-  const structure=getStructure(currentRecord);
-  for(const item of structure) {
-    if(item.tipo!=="parte") continue;
-    for(const ev of item.eventos) {
-      await playEvent(ev);
-      await new Promise(r=>setTimeout(r,420*Math.max(.5,Number(ev.duracion)||1)));
+
+async function playAll(){
+  stopPlayback();
+  const runId=playbackRunId;
+  const speed=getPlaybackSpeedSnapshot();
+
+  const btn=$("#playAllBtn");
+  const speedSelect=$("#playbackSpeed");
+  if(btn) btn.disabled=true;
+  if(speedSelect) speedSelect.disabled=true;
+
+  try{
+    const structure=getStructure(currentRecord);
+    const playable=structure.filter(x=>x.tipo==="parte");
+
+    for(let pi=0;pi<playable.length;pi++){
+      const item=playable[pi];
+
+      for(let ei=0;ei<(item.eventos||[]).length;ei++){
+        const ok=await playEventStable(item.eventos[ei],ei,speed,runId);
+        if(!ok) return;
+      }
+
+      if(pi<playable.length-1){
+        const ok=await waitPlayback(Math.round(420/speed),runId);
+        if(!ok) return;
+      }
     }
+  } finally {
+    clearPlaybackHighlights();
+    if(btn) btn.disabled=false;
+    if(speedSelect) speedSelect.disabled=false;
   }
 }
+
+$("#stopAllBtn")?.addEventListener("click",stopPlayback);
 
 $("#playAllBtn").addEventListener("click",playAll);
 

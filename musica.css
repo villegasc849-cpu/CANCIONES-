@@ -543,3 +543,148 @@ select:focus,input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
   }
   .z-speed-control select{flex:1}
 }
+
+
+/* =========================================================
+   ZAMPOÑA V7 · CORRECCIONES DE REPRODUCCIÓN Y BLOQUES
+   ========================================================= */
+
+.z-pipe.is-playing{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.17),rgba(255,255,255,.03) 20%,rgba(0,0,0,.10) 72%,rgba(255,255,255,.08)),
+    linear-gradient(180deg,#8f5bc0 0%,#6b35a5 48%,#4a216f 100%) !important;
+  border-color:#35154f !important;
+  box-shadow:
+    0 0 0 4px rgba(107,53,165,.20),
+    0 0 26px rgba(107,53,165,.65) !important;
+  transform:translateY(-5px) !important;
+}
+
+.z-pipe.is-playing .z-pipe-hole{
+  background:#1f0e2e !important;
+}
+
+.z-pipe.is-playing .z-pipe-number{
+  background:#fff !important;
+  color:#5d2b8c !important;
+  box-shadow:0 0 0 3px rgba(255,255,255,.22);
+}
+
+.z-pipe.is-playing .z-pipe-note,
+.z-pipe.is-playing small{
+  color:#5d2b8c !important;
+  font-weight:800;
+}
+
+.z-notation-number.is-playing{
+  fill:#7b3fb1 !important;
+  font-weight:900 !important;
+  filter:drop-shadow(0 0 5px rgba(123,63,177,.55));
+  transform:scale(1.22);
+  transform-box:fill-box;
+  transform-origin:center;
+}
+
+.z-structure-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:6px;
+  align-items:stretch;
+  margin-bottom:7px;
+}
+
+.z-structure-main{
+  width:100%;
+  min-width:0;
+  text-align:left;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fffdf9;
+}
+
+.z-structure-main strong{
+  display:block;
+  color:var(--purple-dark);
+}
+
+.z-structure-main small{
+  display:block;
+  margin-top:3px;
+  color:var(--muted);
+  font:11px Arial,sans-serif;
+}
+
+.z-structure-main.active{
+  background:#fff3d2;
+  border-color:var(--gold);
+  box-shadow:inset 3px 0 0 var(--purple);
+}
+
+.z-structure-main.is-divider{
+  background:#f6effc;
+}
+
+.z-structure-tools{
+  display:flex;
+  align-items:center;
+  gap:3px;
+}
+
+.z-structure-tools .mini{
+  width:30px;
+  height:30px;
+  padding:0;
+  border:1px solid #dfd2e8;
+  border-radius:7px;
+  background:#fffaf3;
+  color:var(--purple);
+  font-weight:700;
+}
+
+.z-structure-tools .mini.danger{
+  color:#913f3f;
+}
+
+.z-structure-tools .mini:disabled{
+  opacity:.28;
+  cursor:not-allowed;
+}
+
+.z-empty-structure{
+  padding:15px 10px;
+  text-align:center;
+  color:var(--muted);
+  border:1px dashed var(--gold-soft);
+  border-radius:9px;
+  font:12px Arial,sans-serif;
+}
+
+
+/* =========================================================
+   ZAMPOÑA V8 · PLAYBACK ESTABLE
+   ========================================================= */
+.z-speed-control select:disabled,
+#playAllBtn:disabled,
+#playPartBtn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+.z-pipe.is-playing{
+  background:linear-gradient(180deg,#9b62cb 0%,#7139a8 45%,#4d226f 100%) !important;
+  border-color:#321446 !important;
+  box-shadow:0 0 0 4px rgba(112,57,168,.22),0 0 30px rgba(102,47,154,.72) !important;
+  color:#fff !important;
+}
+
+.z-pipe.is-playing .z-pipe-number{
+  background:#fff !important;
+  color:#602b8d !important;
+}
+
+.z-pipe.is-playing .z-pipe-note,
+.z-pipe.is-playing small{
+  color:#6b35a5 !important;
+  font-weight:900 !important;
+}
