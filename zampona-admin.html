@@ -209,7 +209,20 @@
                 <button id="newPhraseBtn" class="ghost">＋ Espacio / Nueva frase</button>
                 <button id="undoEventBtn" class="ghost">↶ Deshacer</button>
                 <button id="clearEventsBtn" class="ghost danger">Limpiar</button>
-                <button id="playPartBtn" class="ghost">▶ Escuchar parte</button>
+                <label class="z-speed-control z-speed-control--admin">
+  <span>Velocidad</span>
+  <select id="adminPlaybackSpeed">
+    <option value="0.5">x0.5</option>
+    <option value="0.75">x0.75</option>
+    <option value="1" selected>x1</option>
+    <option value="1.25">x1.25</option>
+    <option value="1.5">x1.5</option>
+    <option value="2">x2</option>
+    <option value="2.5">x2.5</option>
+    <option value="3">x3</option>
+  </select>
+</label>
+<button id="playPartBtn" class="ghost">▶ Escuchar parte</button>
               </div>
               <p class="z-space-hint">
                 También puedes presionar la <b>barra espaciadora</b> para separar una frase de otra mientras registras.

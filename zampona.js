@@ -349,6 +349,9 @@ function renderNotation(events) {
     t.setAttribute("x",p.x); t.setAttribute("y",y+6);
     t.setAttribute("text-anchor","middle");
     t.setAttribute("class","z-notation-number");
+    t.dataset.eventIndex=String(p.eventIndex);
+    t.dataset.fila=p.fila;
+    t.dataset.tubo=String(p.tubo);
     t.textContent=p.tubo;
     svg.append(t);
 
@@ -404,21 +407,64 @@ function renderStructure(record) {
   }
 }
 
-async function playEvent(ev) {
-  if (ev.tipo === "separador") {
-    await new Promise(r=>setTimeout(r,650));
+
+
+function playbackSpeed() {
+  const v = Number(document.querySelector("#playbackSpeed")?.value || 1);
+  return Math.max(0.5, Math.min(3, v || 1));
+}
+
+function scaledDelay(ms) {
+  return ms / playbackSpeed();
+}
+
+function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true){
+  document.querySelectorAll(".z-tube").forEach(el=>{
+    const match=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
+    if(match) el.classList.toggle("is-playing",on);
+  });
+  document.querySelectorAll(".z-notation-number").forEach(el=>{
+    const match=(eventIndex===null || Number(el.dataset.eventIndex)===Number(eventIndex)) &&
+      el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
+    if(match) el.classList.toggle("is-playing",on);
+  });
+}
+
+function clearPlaybackHighlights(){
+  document.querySelectorAll(".is-playing").forEach(el=>el.classList.remove("is-playing"));
+}
+
+async function playTubeGuided(fila,tubo,eventIndex=null,duration=1){
+  setPlaybackHighlight(fila,tubo,eventIndex,true);
+  await playTube(fila,tubo);
+  await new Promise(r=>setTimeout(r,Math.max(70,Math.round(scaledDelay(420*Number(duration||1))))));
+  setPlaybackHighlight(fila,tubo,eventIndex,false);
+}
+
+function dragSteps(ev){
+  const a=Number(ev.desde.tubo), b=Number(ev.hasta.tubo);
+  const step=a<=b?1:-1;
+  const arr=[];
+  for(let n=a; step>0?n<=b:n>=b; n+=step) arr.push(n);
+  return arr;
+}
+
+async function playEvent(ev,eventIndex=null) {
+  if(ev.tipo==="separador"){
+    await new Promise(r=>setTimeout(r,scaledDelay(300)));
     return;
   }
-  if (ev.tipo === "arrastre") {
-    const first=findTube(ev.desde.fila,ev.desde.tubo);
-    const second=findTube(ev.hasta.fila,ev.hasta.tubo);
-    if(first) playTube(first,true,.8);
-    await new Promise(r=>setTimeout(r,260));
-    if(second) playTube(second,true,.8);
+
+  if(ev.tipo==="arrastre"){
+    const steps=dragSteps(ev);
+    const each=Math.max(.18,Number(ev.duracion||1)/Math.max(1,steps.length));
+    for(const tubo of steps){
+      await playTubeGuided(ev.desde.fila,tubo,eventIndex,each);
+    }
     return;
   }
-  const t=findTube(ev.fila,ev.tubo);
-  if(t) playTube(t,true,ev.duracion);
+
+  await playTubeGuided(ev.fila,ev.tubo,eventIndex,ev.duracion||1);
 }
 
 async function playAll() {

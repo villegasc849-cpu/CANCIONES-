@@ -311,50 +311,62 @@ $("#saveTubeBtn").addEventListener("click",async()=>{
 });
 
 function renderStructureList() {
-  const host=$("#structureList");
-  host.replaceChildren();
+  const box=$("#structureList");
+  box.innerHTML="";
 
-  structure.forEach((item,index)=>{
-    const row=document.createElement("button");
-    row.type="button";
-    row.className=`z-structure-item${item.id===activeItemId?" active":""}${item.tipo==="divisor"?" is-divider":""}`;
+  state.estructura.forEach((item,index)=>{
+    const row=document.createElement("div");
+    row.className="z-structure-row";
 
-    if(item.tipo==="divisor") {
-      row.innerHTML=`<strong>— ${item.texto || "Comentario / divisor"} —</strong>`;
-    } else {
-      row.innerHTML=`<strong>${item.nombre}</strong><span>${item.eventos.length} evento(s)${item.comentario? " · comentario":""}</span>`;
-    }
-
-    row.addEventListener("click",()=>{
-      activeItemId=item.id;
-      pendingDragStart=null;
+    const main=document.createElement("button");
+    main.type="button";
+    main.className="z-structure-main"+(index===state.activeIndex?" active":"");
+    main.innerHTML=`<b>${esc(item.nombre || `Parte ${index+1}`)}</b><small>${item.tipo==="seccion" ? `${(item.eventos||[]).length} eventos` : "Separador / comentario"}</small>`;
+    main.addEventListener("click",()=>{
+      state.activeIndex=index;
       renderStructureList();
       renderActiveEditor();
     });
 
-    const controls=document.createElement("span");
-    controls.className="z-item-controls";
+    const tools=document.createElement("div");
+    tools.className="z-structure-tools";
 
-    const up=document.createElement("button");
-    up.type="button";up.textContent="↑";up.title="Subir";
-    up.addEventListener("click",e=>{e.stopPropagation();if(index>0){[structure[index-1],structure[index]]=[structure[index],structure[index-1]];renderStructureList();}});
-
-    const down=document.createElement("button");
-    down.type="button";down.textContent="↓";down.title="Bajar";
-    down.addEventListener("click",e=>{e.stopPropagation();if(index<structure.length-1){[structure[index+1],structure[index]]=[structure[index],structure[index+1]];renderStructureList();}});
-
-    const del=document.createElement("button");
-    del.type="button";del.textContent="×";del.title="Eliminar";
-    del.addEventListener("click",e=>{
-      e.stopPropagation();
-      structure.splice(index,1);
-      if(activeItemId===item.id) activeItemId=structure[0]?.id||null;
-      renderStructureList();renderActiveEditor();
+    const rename=document.createElement("button");
+    rename.type="button"; rename.className="mini";
+    rename.textContent="✎";
+    rename.title="Cambiar nombre";
+    rename.addEventListener("click",()=>{
+      const nombre=prompt("Nuevo nombre del bloque:",item.nombre||"");
+      if(nombre!==null && nombre.trim()){
+        item.nombre=nombre.trim();
+        renderStructureList();
+        renderActiveEditor();
+      }
     });
 
-    controls.append(up,down,del);
-    row.append(controls);
-    host.append(row);
+    const up=document.createElement("button");
+    up.type="button"; up.className="mini"; up.textContent="↑"; up.title="Mover arriba";
+    up.disabled=index===0;
+    up.addEventListener("click",()=>{
+      if(index<=0)return;
+      [state.estructura[index-1],state.estructura[index]]=[state.estructura[index],state.estructura[index-1]];
+      state.activeIndex=index-1;
+      renderStructureList(); renderActiveEditor();
+    });
+
+    const down=document.createElement("button");
+    down.type="button"; down.className="mini"; down.textContent="↓"; down.title="Mover abajo";
+    down.disabled=index===state.estructura.length-1;
+    down.addEventListener("click",()=>{
+      if(index>=state.estructura.length-1)return;
+      [state.estructura[index+1],state.estructura[index]]=[state.estructura[index],state.estructura[index+1]];
+      state.activeIndex=index+1;
+      renderStructureList(); renderActiveEditor();
+    });
+
+    tools.append(rename,up,down);
+    row.append(main,tools);
+    box.append(row);
   });
 }
 
@@ -506,6 +518,9 @@ function renderNotation(events) {
     t.setAttribute("x",p.x); t.setAttribute("y",y+6);
     t.setAttribute("text-anchor","middle");
     t.setAttribute("class","z-notation-number");
+    t.dataset.eventIndex=String(p.eventIndex);
+    t.dataset.fila=p.fila;
+    t.dataset.tubo=String(p.tubo);
     t.textContent=p.tubo;
     svg.append(t);
 
@@ -642,19 +657,64 @@ $("#clearEventsBtn").addEventListener("click",()=>{
   p.eventos=[];pendingDragStart=null;renderActiveEditor();renderStructureList();
 });
 
-async function playEvent(ev) {
-  if(ev.tipo==="separador") {
-    await new Promise(r=>setTimeout(r,650));
+
+
+function adminPlaybackSpeed() {
+  const v = Number(document.querySelector("#adminPlaybackSpeed")?.value || 1);
+  return Math.max(0.5, Math.min(3, v || 1));
+}
+
+function adminScaledDelay(ms) {
+  return ms / adminPlaybackSpeed();
+}
+
+function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true){
+  document.querySelectorAll(".z-tube").forEach(el=>{
+    const match=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
+    if(match) el.classList.toggle("is-playing",on);
+  });
+  document.querySelectorAll(".z-notation-number").forEach(el=>{
+    const match=(eventIndex===null || Number(el.dataset.eventIndex)===Number(eventIndex)) &&
+      el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
+    if(match) el.classList.toggle("is-playing",on);
+  });
+}
+
+function clearPlaybackHighlights(){
+  document.querySelectorAll(".is-playing").forEach(el=>el.classList.remove("is-playing"));
+}
+
+async function playTubeGuided(fila,tubo,eventIndex=null,duration=1){
+  setPlaybackHighlight(fila,tubo,eventIndex,true);
+  await playTube(fila,tubo);
+  await new Promise(r=>setTimeout(r,Math.max(70,Math.round(adminScaledDelay(420*Number(duration||1))))));
+  setPlaybackHighlight(fila,tubo,eventIndex,false);
+}
+
+function dragSteps(ev){
+  const a=Number(ev.desde.tubo), b=Number(ev.hasta.tubo);
+  const step=a<=b?1:-1;
+  const arr=[];
+  for(let n=a; step>0?n<=b:n>=b; n+=step) arr.push(n);
+  return arr;
+}
+
+async function playEvent(ev,eventIndex=null) {
+  if(ev.tipo==="separador"){
+    await new Promise(r=>setTimeout(r,adminScaledDelay(300)));
     return;
   }
-  if(ev.tipo==="arrastre") {
-    const a=getTube(ev.desde.fila,ev.desde.tubo),b=getTube(ev.hasta.fila,ev.hasta.tubo);
-    if(a) playTube(a);
-    await new Promise(r=>setTimeout(r,260));
-    if(b) playTube(b);
+
+  if(ev.tipo==="arrastre"){
+    const steps=dragSteps(ev);
+    const each=Math.max(.18,Number(ev.duracion||1)/Math.max(1,steps.length));
+    for(const tubo of steps){
+      await playTubeGuided(ev.desde.fila,tubo,eventIndex,each);
+    }
     return;
   }
-  const t=getTube(ev.fila,ev.tubo);if(t)playTube(t);
+
+  await playTubeGuided(ev.fila,ev.tubo,eventIndex,ev.duracion||1);
 }
 
 $("#playPartBtn").addEventListener("click",async()=>{
@@ -666,27 +726,62 @@ $("#playPartBtn").addEventListener("click",async()=>{
 });
 
 $("#applyManualBtn").addEventListener("click",()=>{
-  const p=activePart();if(!p)return;
-  const dur=Number($("#nextDuration").value)||1;
+  const p=activePart(); if(!p)return;
+  const dur=Number($("#manualDuration").value)||1;
   const tokens=$("#manualSequence").value.trim().split(/\s+/).filter(Boolean);
   const parsed=[];
 
-  for(const token of tokens) {
-    if(token==="/" || token==="|") {
-      if(parsed.length && parsed[parsed.length-1]?.tipo!=="separador") parsed.push({tipo:"separador"});
+  const addSingle=(code,duration=dur)=>{
+    const mm=code.match(/^([SI])(\d{1,2})$/i);
+    if(!mm)return false;
+    const fila=mm[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
+    const max=fila===ROW_TOP?12:11;
+    const tubo=Number(mm[2]);
+    if(tubo<1||tubo>max)return false;
+    parsed.push({tipo:"nota",fila,tubo,duracion:duration});
+    return true;
+  };
+
+  for(const token of tokens){
+    if(token==="/" || token==="|"){
+      if(parsed.length && parsed.at(-1)?.tipo!=="separador") parsed.push({tipo:"separador"});
       continue;
     }
-    const m=token.match(/^([SI])(\d{1,2})$/i);
-    if(!m) continue;
-    const fila=m[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
-    const max=fila===ROW_TOP?12:11;
-    const n=Number(m[2]);
-    if(n>=1 && n<=max) parsed.push({tipo:"nota",fila,tubo:n,duracion:dur});
-  }
-  if(parsed[parsed.length-1]?.tipo==="separador") parsed.pop();
 
+    if(token.includes("&")){
+      const pair=token.split("&");
+      if(pair.length!==2)continue;
+      const a=pair[0].match(/^([SI])(\d{1,2})$/i);
+      const b=pair[1].match(/^([SI])(\d{1,2})$/i);
+      if(!a||!b)continue;
+
+      const fa=a[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
+      const fb=b[1].toUpperCase()==="S"?ROW_TOP:ROW_BOTTOM;
+      const na=Number(a[2]), nb=Number(b[2]);
+      if(fa!==fb)continue;
+
+      if(Math.abs(nb-na)===1){
+        parsed.push({tipo:"nota",fila:fa,tubo:na,duracion:.5,medioGrupo:true});
+        parsed.push({tipo:"nota",fila:fb,tubo:nb,duracion:.5,medioGrupo:true});
+      }else{
+        parsed.push({
+          tipo:"arrastre",
+          desde:{fila:fa,tubo:na},
+          hasta:{fila:fb,tubo:nb},
+          recorrido:true,
+          duracion:dur
+        });
+      }
+      continue;
+    }
+    addSingle(token,dur);
+  }
+
+  if(parsed.at(-1)?.tipo==="separador")parsed.pop();
   p.eventos=parsed;
-  renderActiveEditor();renderStructureList();
+  pendingDragStart=null;
+  renderActiveEditor();
+  renderStructureList();
 });
 
 async function loadSongRecord() {

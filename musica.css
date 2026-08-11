@@ -448,3 +448,98 @@ select:focus,input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
   border-color:var(--purple);
   background:var(--purple-soft);
 }
+
+
+/* =========================================================
+   ZAMPOÑA V5 · REPRODUCCIÓN GUIADA + ESTRUCTURA EDITABLE
+   ========================================================= */
+.z-notation-number{
+  transition:fill .12s ease, filter .12s ease, transform .12s ease;
+  transform-box:fill-box;
+  transform-origin:center;
+}
+.z-notation-number.is-playing{
+  fill:#6b35a5 !important;
+  filter:drop-shadow(0 0 6px rgba(107,53,165,.65));
+  transform:scale(1.2);
+}
+.z-tube{
+  transition:filter .12s ease, box-shadow .12s ease, background .12s ease !important;
+}
+.z-tube.is-playing{
+  background:linear-gradient(180deg,#8b55bd 0%,#603092 55%,#452166 100%) !important;
+  border-color:#35154f !important;
+  box-shadow:0 0 0 3px rgba(111,61,154,.18),0 0 22px rgba(93,44,137,.55) !important;
+  filter:saturate(1.15) brightness(1.05);
+}
+.z-tube.is-playing::before,
+.z-tube.is-playing::after{
+  filter:hue-rotate(245deg) saturate(1.4) !important;
+}
+.z-structure-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:7px;
+  align-items:stretch;
+  margin-bottom:7px;
+}
+.z-structure-main{
+  min-width:0;
+}
+.z-structure-tools{
+  display:flex;
+  gap:4px;
+  align-items:center;
+}
+.z-structure-tools .mini{
+  width:31px;
+  min-width:31px;
+  height:31px;
+  padding:0;
+  border:1px solid #dfd2e8;
+  border-radius:8px;
+  background:#fffaf3;
+  color:#4e286e;
+  cursor:pointer;
+  font-weight:700;
+}
+.z-structure-tools .mini:disabled{
+  opacity:.3;
+  cursor:not-allowed;
+}
+
+
+/* =========================================================
+   ZAMPOÑA V6 · VELOCIDAD DE REPRODUCCIÓN
+   ========================================================= */
+.z-speed-control{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:6px 8px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fffdf9;
+}
+.z-speed-control span{
+  color:var(--muted);
+  font:11px Arial,sans-serif;
+  white-space:nowrap;
+}
+.z-speed-control select{
+  min-width:125px;
+  padding:7px 9px;
+}
+.z-speed-control--admin{
+  margin-left:auto;
+}
+@media(max-width:700px){
+  .z-score-actions{flex-wrap:wrap}
+  .z-speed-control,
+  .z-speed-control--admin{
+    width:100%;
+    margin-left:0;
+    justify-content:space-between;
+  }
+  .z-speed-control select{flex:1}
+}
