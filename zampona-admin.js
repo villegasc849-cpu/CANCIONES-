@@ -736,11 +736,9 @@ $("#clearEventsBtn").addEventListener("click",()=>{
 
 
 
-async 
 
 
 
-async 
 
 
 
@@ -935,7 +933,10 @@ $("#applyManualBtn").addEventListener("click",()=>{
 
       const a=parseCode(pieces[0]);
       const b=parseCode(pieces[1]);
-      if(!a||!b) continue;
+      if(!a||!b){
+        manualError=`${token}: formato inválido. Usa S1–S12 o I1–I11.`;
+        continue;
+      }
 
       // & solo funciona dentro de la misma fila.
       if(a.fila!==b.fila){
@@ -973,7 +974,10 @@ $("#applyManualBtn").addEventListener("click",()=>{
 
   if(manualError){
     setStatus($("#tubeSaveStatus"),manualError,"error");
+  } else {
+    setStatus($("#tubeSaveStatus"),`Secuencia manual aplicada: ${parsed.length} evento(s).`,"success");
   }
+
   renderActiveEditor();
   renderStructureList();
 });
