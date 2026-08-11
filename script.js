@@ -301,7 +301,13 @@ function crearCancion(cancion) {
   enlaceCharango.textContent = "🪕 Abrir en Charango";
   enlaceCharango.style.textDecoration = "none";
 
-  herramientasMusicales.append(enlaceCharango);
+  const enlaceZampona = document.createElement("a");
+  enlaceZampona.className = "song__video-button";
+  enlaceZampona.href = `zampona.html?song=${encodeURIComponent(cancion.id || cancion.numero)}`;
+  enlaceZampona.textContent = "▥ Abrir en Zampoña";
+  enlaceZampona.style.textDecoration = "none";
+
+  herramientasMusicales.append(enlaceCharango, enlaceZampona);
   letra.append(herramientasMusicales);
 
   contenidoInterior.append(letra);

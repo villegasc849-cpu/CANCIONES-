@@ -246,9 +246,9 @@ function eventPoints(events) {
   return pts;
 }
 
-function renderNotation(events) {
+function renderNotation(events, blockId="") {
   const points = eventPoints(events);
-  const unit = 82, separatorGap = 72, pad = 38;
+  const unit = 54, separatorGap = 58, pad = 28;
   const yTop = 42, yBottom = 112, height = 165;
 
   let cursor = pad;
@@ -352,6 +352,7 @@ function renderNotation(events) {
     t.setAttribute("text-anchor","middle");
     t.setAttribute("class","z-notation-number");
     t.dataset.eventIndex=String(p.eventIndex);
+    t.dataset.blockId=String(blockId || "");
     t.dataset.fila=p.fila;
     t.dataset.tubo=String(p.tubo);
     t.textContent=p.tubo;
@@ -395,7 +396,7 @@ function renderStructure(record) {
 
     const score=document.createElement("div");
     score.className="z-part-score";
-    score.append(renderNotation(item.eventos));
+    score.append(renderNotation(item.eventos, item.id));
 
     section.append(side,score);
     host.append(section);
@@ -425,7 +426,7 @@ function renderStructure(record) {
 
 
 
-function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true){
+function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true,blockId=null){
   document.querySelectorAll(".z-pipe").forEach(el=>{
     const match=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
     if(match) el.classList.toggle("is-playing",on);
@@ -434,7 +435,8 @@ function setPlaybackHighlight(fila,tubo,eventIndex=null,on=true){
   document.querySelectorAll(".z-notation-number").forEach(el=>{
     const sameTube=el.dataset.fila===fila && Number(el.dataset.tubo)===Number(tubo);
     const sameEvent=eventIndex===null || Number(el.dataset.eventIndex)===Number(eventIndex);
-    if(sameTube && sameEvent) el.classList.toggle("is-playing",on);
+    const sameBlock=blockId===null || String(el.dataset.blockId)===String(blockId);
+    if(sameTube && sameEvent && sameBlock) el.classList.toggle("is-playing",on);
   });
 }
 
@@ -495,11 +497,11 @@ function synthStable(freq,durationMs,runId){
   osc.stop(now+seconds+.015);
 }
 
-async function playGuidedNote(fila,tubo,eventIndex,durationUnits,speed,runId){
+async function playGuidedNote(fila,tubo,eventIndex,durationUnits,speed,runId,blockId=null){
   if(runId!==playbackRunId) return false;
 
   clearPlaybackHighlights();
-  setPlaybackHighlight(fila,tubo,eventIndex,true);
+  setPlaybackHighlight(fila,tubo,eventIndex,true,blockId);
 
   const tube=findTube(fila,tubo);
   const baseMs=520*Math.max(.25,Number(durationUnits)||1);
@@ -508,7 +510,7 @@ async function playGuidedNote(fila,tubo,eventIndex,durationUnits,speed,runId){
   if(tube) synthStable(tube.frecuencia,ms*.9,runId);
 
   const ok=await waitPlayback(ms,runId);
-  setPlaybackHighlight(fila,tubo,eventIndex,false);
+  setPlaybackHighlight(fila,tubo,eventIndex,false,blockId);
   return ok;
 }
 
@@ -522,7 +524,7 @@ function dragTubeNumbers(ev){
   return values;
 }
 
-async function playEventStable(ev,eventIndex,speed,runId){
+async function playEventStable(ev,eventIndex,speed,runId,blockId=null){
   if(runId!==playbackRunId) return false;
 
   if(ev.tipo==="separador"){
@@ -538,13 +540,13 @@ async function playEventStable(ev,eventIndex,speed,runId){
     const eachUnits=totalUnits/nums.length;
 
     for(const tubo of nums){
-      const ok=await playGuidedNote(ev.desde.fila,tubo,eventIndex,eachUnits,speed,runId);
+      const ok=await playGuidedNote(ev.desde.fila,tubo,eventIndex,eachUnits,speed,runId,blockId);
       if(!ok) return false;
     }
     return true;
   }
 
-  return await playGuidedNote(ev.fila,ev.tubo,eventIndex,ev.duracion||1,speed,runId);
+  return await playGuidedNote(ev.fila,ev.tubo,eventIndex,ev.duracion||1,speed,runId,blockId);
 }
 
 
@@ -566,7 +568,7 @@ async function playAll(){
       const item=playable[pi];
 
       for(let ei=0;ei<(item.eventos||[]).length;ei++){
-        const ok=await playEventStable(item.eventos[ei],ei,speed,runId);
+        const ok=await playEventStable(item.eventos[ei],ei,speed,runId,item.id);
         if(!ok) return;
       }
 

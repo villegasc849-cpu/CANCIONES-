@@ -92,13 +92,9 @@ $("#referencePlayBtn").addEventListener("click", () => {
   }
 });
 
-function sectionTokens(record){ return Object.values(record?.secciones || {}).flat().filter(Boolean); }
-function chordNamesFromToken(token){
-  if(typeof token !== "string" || token.trim().startsWith("#")) return [];
-  return token.split("/").map(x=>x.trim()).filter(Boolean);
-}
 function uniqueChords(record) {
-  return [...new Set(sectionTokens(record).flatMap(chordNamesFromToken))];
+  const sections = record?.secciones || {};
+  return [...new Set(Object.values(sections).flat().filter(Boolean))];
 }
 
 function renderSections(record) {
@@ -118,16 +114,13 @@ function renderSections(record) {
     const row = document.createElement("div");
     row.className = "sequence public-sequence";
 
-    values.forEach(token => {
-      if(String(token).trim().startsWith("#")){
-        const note=document.createElement("div"); note.className="section-comment";
-        note.textContent=String(token).trim().slice(1).trim(); row.append(note); return;
-      }
-      const names=chordNamesFromToken(token);
-      const beat=document.createElement("div"); beat.className="chord-beat";
-      names.forEach(name=>{ const btn=document.createElement("button"); btn.type="button"; btn.className="chord-chip"; btn.textContent=name; btn.addEventListener("click",()=>selectChord(name)); beat.append(btn); });
-      if(names.length>1){ const tag=document.createElement("small"); tag.textContent="mismo tiempo"; beat.append(tag); }
-      row.append(beat);
+    values.forEach(name => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chord-chip";
+      btn.textContent = name;
+      btn.addEventListener("click", () => selectChord(name));
+      row.append(btn);
     });
     section.append(h3, row);
     container.append(section);
@@ -155,24 +148,49 @@ function renderUsedChords(record) {
 function xForOrder(order) {
   return ((Number(order) - 1) / 4) * 100;
 }
-let visibleFrets=8;
-function yForFret(fret) { return ((Number(fret) - 0.5) / visibleFrets) * 100; }
-function maxFretFor(data){
-  const fingers=(data?.digitacion||[]).map(x=>Number(x.traste)||0);
-  const bars=(data?.cejillas||[]).map(x=>Number(x.traste)||0);
-  return Math.max(5,...fingers,...bars);
+
+function fretWindow(data) {
+  const frets = [];
+  (Array.isArray(data?.digitacion) ? data.digitacion : []).forEach(x => frets.push(Number(x.traste)||0));
+  (Array.isArray(data?.cejillas) ? data.cejillas : []).forEach(x => frets.push(Number(x.traste)||0));
+  const used = frets.filter(n => n > 0);
+  const max = used.length ? Math.max(...used) : 1;
+  const min = used.length ? Math.min(...used) : 1;
+  // Near the nut: show 1–5. High positions: compact 5-fret window.
+  const start = max <= 5 ? 1 : Math.max(1, min);
+  return { start, count: 5, end: start + 4 };
 }
-function buildNeckBase(board) {
+
+function yForFret(fret, windowInfo) {
+  const local = Number(fret) - windowInfo.start + 1;
+  return ((local - 0.5) / windowInfo.count) * 100;
+}
+
+function buildNeckBase(board, windowInfo) {
+  const shell = document.createElement("div");
+  shell.className = "charango-neck-shell";
+
+  if (windowInfo.start > 1) {
+    const badge = document.createElement("span");
+    badge.className = "fret-start-badge";
+    badge.textContent = `Traste ${windowInfo.start}`;
+    shell.append(badge);
+  }
+
   const neck = document.createElement("div");
   neck.className = "fretboard-neck";
+  neck.dataset.startFret = String(windowInfo.start);
 
   const nut = document.createElement("span");
   nut.className = "fretboard-nut";
+  if (windowInfo.start > 1) nut.classList.add("is-shifted");
   neck.append(nut);
 
-  for (let fret = 1; fret <= visibleFrets; fret++) {
-    const line = document.createElement("span"); line.className = "fret-line";
-    line.style.top = `${(fret / visibleFrets) * 100}%`; neck.append(line);
+  for (let fret = 1; fret <= windowInfo.count; fret++) {
+    const line = document.createElement("span");
+    line.className = "fret-line";
+    line.style.top = `${(fret / windowInfo.count) * 100}%`;
+    neck.append(line);
   }
 
   for (let order = 1; order <= 5; order++) {
@@ -182,15 +200,17 @@ function buildNeckBase(board) {
     neck.append(line);
   }
 
-  board.append(neck);
+  shell.append(neck);
+  board.append(shell);
   return neck;
 }
 
 function renderFretboard(data) {
-  const board = $("#fretboard"); board.replaceChildren();
-  visibleFrets=Math.max(8,maxFretFor(data)+1);
-  const nums=$("#fretNumbers"); if(nums){ nums.style.gridTemplateColumns=`repeat(${visibleFrets},1fr)`; nums.replaceChildren(); for(let i=1;i<=visibleFrets;i++){const x=document.createElement("span");x.textContent=i===1?"Traste 1":i;nums.append(x);} }
-  const neck = buildNeckBase(board);
+  const board = $("#fretboard");
+  board.replaceChildren();
+  const win = fretWindow(data);
+  const neck = buildNeckBase(board, win);
+
   if (!data) return;
 
   const open = new Set((Array.isArray(data.abiertas) ? data.abiertas : []).map(Number));
@@ -213,31 +233,31 @@ function renderFretboard(data) {
 
   const barres = Array.isArray(data.cejillas) ? data.cejillas : [];
   barres.forEach(b => {
+    const fret = Number(b.traste);
+    if (fret < win.start || fret > win.end) return;
     const from = Math.max(1, Math.min(5, Number(b.desde)));
     const to = Math.max(1, Math.min(5, Number(b.hasta)));
-    const min = Math.min(from, to);
-    const max = Math.max(from, to);
-
+    const min = Math.min(from, to), max = Math.max(from, to);
     const bar = document.createElement("span");
     bar.className = "barre";
-    bar.style.top = `${yForFret(b.traste)}%`;
+    bar.style.top = `${yForFret(fret,win)}%`;
     bar.style.left = `${xForOrder(min)}%`;
     bar.style.width = `${xForOrder(max) - xForOrder(min)}%`;
-
     const n = document.createElement("span");
     n.className = "barre-number";
     n.textContent = Number(b.dedo) || 1;
-    bar.append(n);
-    neck.append(bar);
+    bar.append(n); neck.append(bar);
   });
 
   const fingers = Array.isArray(data.digitacion) ? data.digitacion : [];
   fingers.forEach(item => {
+    const fret=Number(item.traste);
+    if (fret < win.start || fret > win.end) return;
     const dot = document.createElement("span");
     dot.className = "finger-dot";
     dot.textContent = Number(item.dedo) || "●";
     dot.style.left = `${xForOrder(item.orden)}%`;
-    dot.style.top = `${yForFret(item.traste)}%`;
+    dot.style.top = `${yForFret(fret,win)}%`;
     neck.append(dot);
   });
 }
